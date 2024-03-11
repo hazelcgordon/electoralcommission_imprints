@@ -857,7 +857,7 @@ Perceived informedness:
 
 ## Hypotheses
 
-### Hypothesis 1: effect of digital imprint presence on informedness
+## Hypothesis 1: effect of digital imprint presence on informedness
 
 -   H1a: Digital imprints will increase actual informedness, increasing respondents awareness of the persuasive intent and political nature of a piece of campaign material
 
@@ -867,7 +867,7 @@ Perceived informedness:
 
 <details>
 
-```{r mixed effects libraries}
+```{r mixed effects libraries, warning=FALSE}
 
 library(lme4)
 library(Matrix)
@@ -877,6 +877,9 @@ library(ggeffects)
 library(performance)
 library(see)
 library(patchwork)
+library(knitr)
+library(kableExtra)
+library(broom)
 
 ```
 
@@ -906,7 +909,7 @@ ainform_pg <- lmer(PG_value ~ version + (1|id) + (1|advert), data = imprint_df)
 
 ### Model outcomes: table
 
-```{r}
+```{r, echo=FALSE}
 
 #Visualising the findings: table
 
@@ -921,7 +924,7 @@ inform_pg_tab
 
 ### Plotting: raw data
 
-```{r}
+```{r, echo=FALSE}
 
 #visualising: raw data
 
@@ -935,7 +938,7 @@ ggplot(imprint_df, aes(x = factor(version), y = PG_value)) +
 
 ### Plotting: model predictions
 
-```{r,}
+```{r, echo=FALSE}
 
 #visualising the findings: model predictions
 
@@ -956,12 +959,11 @@ ggplot(preds, aes(x = x, y = predicted)) +
 
 ### Model assumptions
 
-```{r}
+```{r, echo=FALSE}
 
 #Checking model assumptions
 
 check_model(ainform_pg)
-
 
 
 #saving the table
@@ -977,7 +979,7 @@ check_model(ainform_pg)
 
 ```{r persuasion knowledge actual informedness}
 
-#Hypothesis 1a, model 1
+#Hypothesis 1a, model 2
 
 ainform_pk <- lmer(PK ~ version + (1|id) + (1|advert), data = imprint_df)
 
@@ -985,7 +987,7 @@ ainform_pk <- lmer(PK ~ version + (1|id) + (1|advert), data = imprint_df)
 
 ### Model outcomes: table
 
-```{r}
+```{r, echo=FALSE}
 
 #Visualising the findings: table
 
@@ -1000,7 +1002,7 @@ inform_pk_tab
 
 ### Plotting: raw data
 
-```{r}
+```{r, echo=FALSE}
 
 ggplot(imprint_df, aes(x = factor(version), y = PK)) +
   geom_jitter(width = 0.2, alpha = 0.5) +
@@ -1012,7 +1014,7 @@ ggplot(imprint_df, aes(x = factor(version), y = PK)) +
 
 ### Plotting: model predictions
 
-```{r}
+```{r, echo=FALSE}
 
 #visualising the findings: model predictions
 
@@ -1040,37 +1042,322 @@ Did viewing a digital imprint with a piece of campaign material increase partici
 To test this, each correct campaign name can be tested one by one with a logistical regression model to see if viewing the imprint boosted recall of the name. For this measure, there will therefore be 4 models and corresponding visualisations. This also uses the independent measures data frame with only one row per participant: training_df.
 
 Correct names:
--   Breaking barriers alliance: BBA
--   Speak freely inc: SFI
--   Common sense collective: CSC
--   Campaign for a better Britain: CBB
+- Advert 1: Common sense collective: CSC 
+- Advert 2: Breaking barriers alliance: BBA
+- Advert 3: Speak freely inc: SFI
+- Advert 4: Campaign for a better Britain: CBB
+
+This analysis also will tell us something about how the imprint impacted recall for each advert differently. If imprints only increase recall on some adverts and not others, this may be related to the formatting and aesthetic features of the post itself e.g., how obvious the campaign name was, or even how memorable the name was. To find evidence that supports digital imprints consistently increase recall, regardless of the formatting of the imprint, we should expect to consistently see higher recall across four campaign group names when an imprint is present.
 
 ### Models
+
+The following models will be created using a function:
+
+csc_recall <- glm(CSC ~ Advert.1, data = training_df, family = binomial())
+
+bba_recall <- glm(BBA ~ Advert.2, data = training_df, family = binomial())
+
+sfi_recall <- glm(SFI ~ Advert.3, data = training_df, family = binomial())
+
+cbb_recall <- glm(CBB ~ Advert.4, data = training_df, family = binomial())
+
+
+```{r logistic regression function, echo=FALSE}
+
+fit_and_summarize_model <- function(outcome_var, predictor_var, data) {
+  # Fit the logistic regression model
+  formula <- as.formula(paste(outcome_var, "~", predictor_var))
+  model <- glm(formula, data = data, family = binomial())
+  
+  # Extract the model summary
+  summary_df <- summary(model)$coefficients
+  
+  # Calculate odds ratios
+  odds_ratios <- exp(summary_df[, 1])
+  
+  # Calculate 95% confidence intervals for odds ratios
+  conf_int <- exp(confint(model))
+  
+  # Create a summary table
+  model_table <- data.frame(
+    Coefficient = summary_df[, 1],
+    SE = summary_df[, 2],
+    `Odds Ratio` = odds_ratios,
+    `Lower CI` = conf_int[,1],  # 2.5 % 
+    `Upper CI` = conf_int[,2],  # 97.5%
+    `p-value` = summary_df[, 4]
+  )
+  
+  rownames(model_table) <- c("(Intercept)", predictor_var)
+  
+  return(model_table)
+}
+
+```
+
+### Table
+
+Logs odds from the default model are converted to an odds ratio for easier interpretation. These are then presented as a table with the output of the regression. To understand the direction of the odds ratio, check the original log odds coefficient. 
+
+```{r, include=FALSE}
+
+# Define the outcome variables and their corresponding predictors
+#WILL NEED TO ADD IN CBB FOR REAL DATA SET
+outcomes_and_predictors <- list(
+  CSC = "Advert.1",
+  BBA = "Advert.2",
+  SFI = "Advert.3"
+)
+
+# Initialize an empty list to store the tables
+model_tables <- list()
+
+# Loop through each outcome-predictor pair
+for (outcome in names(outcomes_and_predictors)) {
+  predictor <- outcomes_and_predictors[[outcome]]
+  model_name <- paste(outcome, "recall", sep = "_")
+  
+  # Apply the function
+  model_tables[[model_name]] <- fit_and_summarize_model(outcome, predictor, training_df)
+}
+
+# model_tables now contains THREE tables - for real dataset, will have four
+
+list2env(model_tables, envir = .GlobalEnv)
+
+```
+
+```{r, echo=FALSE}
+
+# Function to change the column names 
+
+column_names <- function(dataframe) {
+  dataframe <- dataframe %>%
+  rename(`Odds ratio` = `Odds.Ratio`,
+         `95% CI(lower)` = `Lower.CI`,
+         `95% CI(upper)` = `Upper.CI`,
+         `p-value` = `p.value`)
+  return(dataframe)
+}
+
+CSC_recall <- column_names(CSC_recall)
+BBA_recall <- column_names(BBA_recall)
+SFI_recall <- column_names(SFI_recall)
+#CBB_recall <- column_names(CBB_recall)
+
+# Function to change rowname
+
+row_names <- function(dataframe) {
+  rownames(dataframe)[2] <- "Imprint viewed with material"
+  
+  return(dataframe)
+}
+
+CSC_recall <- row_names(CSC_recall)
+BBA_recall <- row_names(BBA_recall)
+SFI_recall <- row_names(SFI_recall)
+#CBB_recall <- row_names(CBB_recall)
+
+kable(CSC_recall, format = "html", digits = 2, caption = "Recall of Common Sense Collective campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+kable(BBA_recall, format = "html", digits = 2, caption = "Recall of Breaking Barriers Alliance campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+kable(SFI_recall, format = "html", digits = 2, caption = "Recall of Speak Freely Inc campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#kable(CBB_recall, format = "html", digits = 2, caption = "Recall of common sense #collective campaign group by imprint viewed") %>%
+#  kable_styling(bootstrap_options = c("striped", "hover"))
+
+
+```
+
+### Plotting: Raw data
+
+```{r, echo=FALSE}
+
+csc_raw <- ggplot(training_df, aes(x = factor(Advert.1, labels = c("no imprint", "imprint")), fill = factor(CSC, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Common Sense Collective", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Common Sense Collective", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+bba_raw <- ggplot(training_df, aes(x = factor(Advert.2, labels = c("no imprint", "imprint")), fill = factor(BBA, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Breaking Barriers Alliance", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Breaking Barriers Alliance", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(),
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+sfi_raw <- ggplot(training_df, aes(x = factor(Advert.3, labels = c("no imprint", "imprint")), fill = factor(SFI, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Speak Freely Inc", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Speak Freely Inc", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(),
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+composite_plot <- csc_raw + bba_raw + sfi_raw + plot_layout(guides = "collect") 
+
+composite_plot
+
+```
+
+### Model assumptions
+
+```{r}
+
+
+```
+
+
+## Hypothesis 2: effect of the training condition on actual and perceived informedness
+
+-   H2a: the training condition will increase the respondents ability to identify when a campaigner has been compliant with electoral transparency law (actual informedness)
+
+-   H2b: the training condition will increase perceived informedness, increasing respondents confidence and accuracy with which they can identify the source of a piece of digital campaign material and recognise regulatory compliance
+
+-   H2c: actual informedness will correlate with perceived informedness
+
+-   Null: the training condition will not increase perceived or actual informedness regarding the source of the campaign material.
+
+
+## Hypothesis 2a: outcome: number recall {.tabset}
+
+Do participants more correctly recall that 2 of the pieces of material included imprints when they were trained of thier purpose (and primed to notice them)?
+
+### Model
+
+```{r}
+
+```
+
 
 ### Table
 
 ### Plotting: Raw data
 
-### Plotting: model predictions
-
-## Hypothesis 2: effect of the training condition on informedness
-
--   H2a: the training condition will increase the respondents ability to identify when a campaigner has been compliant with electoral transparency law
-
--   H2b: the training condition will increase both actual and perceived informedness, increasing respondents confidence and accuracy with which they can identify the source of a piece of digital campaign material and recognise regulatory compliance
-
--   H2c: the training condition will increase percieved informedness, but not actual informedness.
-
--   Null: the training condition will not increase perceived or actual informedness regarding the source of the campaign material.
+### Plotting: Model predictions
 
 
-```{r effect of training condition}
+## Hypothesis 2a: outcome: correct name recall {.tabset}
+
+Did participants recall a higher number of correct campaigner names when they are trained to pay attention to the source?
+
+### Model
+
+### Table
+
+### Plotting: Raw data
+
+### Plotting: Model predictions
+
+
+## Hypothesis 2b: outcome: perceived informedness {.tabset}
+
+Were trained participants more likely to correctly identify that they were less informed when a digital imprint was *not* present, and more informed when a digital imprint was present, compared to the group who received no training?
+
+### Model
+
+- Outcome: perceived informedness, numerical 1-7
+- fixed effect: training condition x version of imprint viewed (interaction effect)
+- random effects: id and advert
+
+```{r}
+
+inform_training <- lmer(informed ~ Training.condition + version + Training.condition*version + (1|id) + (1|advert), data = imprint_df)
+
+```
+
+### Table
+
+```{r, echo=FALSE}
+
+inform_train_tab <- tab_model(inform_training, 
+                           pred.labels = c("Intercept", "Training", "Digital Imprint 
+                                           included", "Training*imprint"),
+                           dv.labels = "Perceived Informedness")
+
+inform_train_tab
+
+```
+
+### Plotting: Raw data
+
+```{r, echo=FALSE}
+
+# Calculate summary statistics
+summary_stats <- imprint_df %>%
+  group_by(Training.condition, version) %>%
+  summarise(n = n(),
+            mean_informed = mean(informed, na.rm = TRUE),
+            sd_informed = sd(informed, na.rm = TRUE),
+            se_informed = sd_informed / sqrt(n),
+            ci_upper = mean_informed + 1.96 * se_informed,
+            ci_lower = mean_informed - 1.96 * se_informed) %>%
+  ungroup()
+
+kable(summary_stats, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved informedness") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+pi_plot <- ggplot(data = imprint_df, aes(x = Training.condition, y = informed, fill = version)) 
+
+pi_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
+
+```
+
+### Plotting: Model predictions
+
+```{r, echo=FALSE}
+
+preds <- ggpredict(inform_training, terms = c("Training.condition", "version"))
+
+plot(preds) +
+  ylim(1, 7) +
+  labs(title = "Interaction Effect",
+       x = "Training condition",
+       y = "Predicted perceived informedness",
+       color = "Digital imprint \n included")
+
+```
+
+### Assumptions
+
+## Hypothesis 2c: outcome: correct versus incorrect recall
+
+Does percieved informedness correlate with actual informedness? How is percieved informedness impacted by the training condition?
+
+This hypothesis has already partly been tested by previous models. For example, the interaction effect of training condition and version on percieved informedness. Here, if percieved informedness correlated with actual informedness, we would expect to see lower informedness for material viewed without an imprint. We would expect a bigger difference between those who had been trained, indicating a higher awareness and understanding about when they had - and had not - been informed about the source.
+
+However, we can further test whether the training condition caused participants to be more confident in how informed they were, but less accurate. This is by using the responses from the name recall measure, where participants were given a multiple choice of many names and were asked to identify the campaign names of the posts they viewed. Four were correct, and a higher number of correct name identification suggests increased informedness about the source. However, those who were trained might just feel more confident that they are informed and therefore more likely to select a number of names from the list. As four of the names were incorrect, to check for this we can test whether the training condition increased the number of incorrect names identified - this indicates increased confidence, but lower accuracy.
+
+```{r}
 
 
 
 ```
 
-## Hypothesis 3: consistency of digital imprint informedness effects
+
+## Hypothesis 3: consistency of digital imprint informedness effects {.tabset}
 
 -   H3: informedness about the source will be increased by the presence of a digital imprint, even when accounting for variations in campaign material content and format
 
@@ -1078,20 +1365,27 @@ Correct names:
 
 Is there evidence to suggest that it is the aesthetic style and content of an advert itself that increases informedness about a source, and do digital imprints play a role in informing citizens above and beyond this?
 
-To explore this, we conduct an independent measures analysis, comparing the effect of viewing each campaign post with and without the inclusion of a digital imprint on persuasion knowledge and political goal recognition, as well as comparing overall differences in name recall between adverts.
+This hypothesis has already partly been tested in the name recall section under hypothesis 1b, outcome: recall of names.
 
-### Variations in persuasion knowledge and political goal recognition between adverts
+To further explore this, we can conduct an analysis comparing the effect of viewing each campaign post with and without the inclusion of a digital imprint on persuasion knowledge, political goal recognition, and perceived informedness.
 
-```{r advert level variations in informedness}
+### Persuasion knowledge
+
+```{r advert level variations in PK}
 
 #show one error bar chart that plots the distibution of responses for persuasion knowledge and political goal recognition, plotting imprint viewed and imprint not viewed seperately. 
 
 ```
 
-### Variations in recall
+### Political goal recognition
 
-```{r advert level variations}
+```{r advert level variations in PG}
 
-#show how well each name was remembered as a frequency bar graph, plotting imprint viewed and imprint not viewed separately.
+```
+
+### Informedness
+
+```{r advert level variations in informed}
+
 
 ```

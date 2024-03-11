@@ -712,7 +712,7 @@ Variable descriptions for those with unclear names:
 #NEED TO ADD LEFT/RIGHT WING INFO INTO QUALTRICS
 
 control_measures <- data %>%
-  select(id, Training.condition, recall_num, recall_name, recall_answer, recall_correct, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, reg_know, useful_rank_1, political_interest, SM_use, SM_frequency_1, partyID, age, gender, education)
+  select(id, Training.condition, recall_num, recall_name, recall_answer, recall_correct, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, name_correct, name_incorrect, reg_know, useful_rank_1, political_interest, SM_use, SM_frequency_1, partyID, age, gender, education)
 
 #matching id number with the repeated measures dataframe so these variables are repeated across rows
 
@@ -722,7 +722,7 @@ imprint_df <- repeated_measures %>%
 #changing the order of columns: ADD IN RECALL NAME AND NUM VARIABLES
 
 imprint_df <- imprint_df %>%
-  select(id, Advert.1, Advert.2, Advert.3, Advert.4, Training.condition, advert, version, PK, informed, PG_value, agree_value, trustworthy_value, believable_value, accurate_value, factual_value, recall_num, recall_correct, recall_answer, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, useful_rank_1, political_interest, reg_know, SM_use, SM_frequency_1, partyID, age, gender, education, everything())
+  select(id, Advert.1, Advert.2, Advert.3, Advert.4, Training.condition, advert, version, PK, informed, PG_value, agree_value, trustworthy_value, believable_value, accurate_value, factual_value, recall_num, recall_correct, recall_answer, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, name_correct, name_incorrect, useful_rank_1, political_interest, reg_know, SM_use, SM_frequency_1, partyID, age, gender, education, everything())
 
 ```
 

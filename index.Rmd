@@ -1,5 +1,10 @@
 ---
-title: "Hypothesis testing"
+title: "Experiment testing the impact of digital imprints on organic campaign material"
+author: 
+-   name: Kate Dommett
+-   name: Tom Stafford
+-   name: Junyan Zhu
+-   name: Hazel Gordon
 output: 
   html_document:
     toc: true
@@ -800,14 +805,17 @@ rm(list=setdiff(ls(), c("data", "imprint_df", "training_df")))
 
 This document relies on the correct data frames having been formed from the code above which can be viewed under 'details'. This information is also stored in a seperate R Markdown document 'datawrangling_code.Rmd'. The correct data frames used in the following analyses are called: imprint_df and training_df. Some hypotheses are tested using the former dataframe, which includes four rows for each participant to capture the repeated measures part of the experiment. Some hypotheses are tested using the latter dataframe, which includes only one row per participant.
 
-## Research Question 1
+### Research questions
 
-Research question 1 investigates whether claims that digital imprints will better inform citizens about the source of a piece of campaign material are supported. Informedness is tested in multiple ways: through persuasion knowledge, political goal recognition, perceived informedness, recall of the source and recall of transparency.
+**Research question 1**: What is the effect of viewing an imprint on perceptions of the content and how informed a citizen is about the campaigners that target them with online political advertising?
 
-<p align="center"> **Actual and percieved informedness** </p>
+**Research question 2**: What is the effect of having explicit knowledge about the purpose of digital imprints and their relation to regulatory compliance on the evaluation of campaign content, how informed a citizen is about the campaigners that target them with online advertising, and confidence in regulatory oversight?
 
-These measures allow distinguishing between actual and percieved informedness, which is expected to be affected by the training condition. Increased perceived informedness may lead to more confidence when answering the recall measures, but not necessarily more accuracy. Thus, we test whether the training condition improves both perceived and actual recall.
+**Research question 3**: Do citizens view information made transparent as relevant and useful for the self or for others, and how does this perception affect their trust in campaign material overall?
 
+### Outcome 1: informedness
+
+This experiment investigates whether claims that digital imprints will better inform citizens about the source of a piece of campaign material are supported. Informedness is tested in multiple ways: through persuasion knowledge, political goal recognition, perceived informedness, recall of the source and recall of transparency.
 
 <p align="center"> **Persuasion knowledge and political goal recognition** </p>
 
@@ -827,27 +835,31 @@ Informedness through name recall tests if the name of the campaign group can be 
 
 Informedness through transparency recall tests the extent to which participants are able to recall how many campaign images they viewed contained transparency information. This is used as a proxy for compliance recognition, and is expected to be higher in those who were 'trained'.
 
-<p align="center"> **Real world justification of measures**</p>
+<p align="center"> **Actual and percieved informedness** </p>
+
+The above measures allow distinguishing between actual and perceived informedness, which is expected to be affected by the training condition. Increased perceived informedness may lead to more confidence when answering the recall measures, but not necessarily more accuracy. Thus, we test whether the training condition improves both perceived and actual recall.
+
+<p align="center"> **Real world justification of informedness measures**</p>
 
 -   Increased persuasion knowledge and political goal recognition would support digital imprints lead citizens to a deeper understanding of *how* posts viewed in the online environment are trying to influence their vote choice.
 -   Increased perceived informedness would support digital imprints lead to more confidence in citizens perception that they are informed about campaigners during election times.
 -   Increased campaign name recall would support digital imprints lead citizens to a deeper understanding of *who specifically* in the online environment is trying to influence their vote choice. 
 -   Increased transparency recall would support citizens can use digital imprints to determine which campaigners are compliant with electoral law.
 
-<p align="center">**Advert level variations**</p>
+<p align="center">**Advert level variations in informedness**</p>
 
 Order effects are accounted for with randomisation of the advertisements. However, certain aspects of the campaign material may have made it more memorable, regardless of whether the digital imprints are present. Thus, advert-level variations in recall are also checked. As realistic campaign posts are shown to respondents, with a variety of visual and content differences, this study tests material with high real life validity to investigate if digital imprints, in the forms they will actually be seen in, are able to stand out and consistently increase informedness, regardless of the content of the post or the form in which they appear. Understanding these divergences is essential knowledge for the Electoral Commission, as they have thus far noticed that the use of digital imprints is not consistent, with the requirements allowing for a range of different disclosure formats. For this reason, a variety of Facebook post aesthetics are tested: 2 are scrolling on a newsfeed, 1 is clicking to enlarge an image, and 1 is viewing the page of a campaign group and seeing their top post. The style of Facebook, e.g. fonts and post/page structure, is kept constant.
 
 Furthermore, the political intent of the post is more obvious in some posts compared to others. However, in all posts the political nature of the content is expected to be clear, and thus not difficult for respondents to identify. This is important to ensure regulatory compliance can be recognised.
 
-## Measurements
+#### Measurements of informedness
 
 Actual informedness:
 
 -   **Persuasion knowledge**, numerical scale 1-7
 -   **Recognition of political goal**, numerical scale 1-7
 -   **Correct recall of the campaign groups names**, numerical scale 0-4, number of correct campaign group names recalled
--   **Transparency recall**, binary variable with response '2' = correct, any other response = incorrect
+-   **Transparency/number recall**, binary variable with response '2' = correct, any other response = incorrect
 
 Perceived informedness:
 
@@ -855,7 +867,22 @@ Perceived informedness:
 -   **Incorrect recall of the campaign groups names**, numerical scale 0-4, number of incorrect campaign groups recalled.
 -   **Confidence in transparency recall**, binary variable: those who chose 'not sure' = 0, those who gave a number between 0 and 4 = 1.
 
+
+### Outcome 2: trustworthiness
+
+#### Measurements of trustworthiness
+
+### Outcome 3: confidence in regulatory oversight
+
+#### Measurements of regulatory confidence
+
+### Outcome/predictor 4: usefulness rankings
+
+#### Measurement of usefulness ranking
+
 ## Hypotheses
+
+*Currently these hypotheses are organised by outcome. Hypothesis 1, 2 and 3 related to informedness; .... **These do not align with the paper draft**, and will need to be renamed once a structure is chosen.*
 
 ## Hypothesis 1: effect of digital imprint presence on informedness
 
@@ -889,7 +916,7 @@ Above are the R packages used for analysis and visualisation.
 
 ## Hypothesis 1a, outcome: political goal {.tabset}
 
-Model 1: did the presence of a digital imprint with a piece of campaign material increase participant awareness that the material had a political goal?
+Did the presence of a digital imprint with a piece of campaign material increase participant awareness that the material had a political goal?
 
 As this is a repeated measures design, the model tested is a random effects model, adding random effects for the advert viewed and the participant number.
 
@@ -909,7 +936,7 @@ ainform_pg <- lmer(PG_value ~ version + (1|id) + (1|advert), data = imprint_df)
 
 ### Model outcomes: table
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 #Visualising the findings: table
 
@@ -924,7 +951,7 @@ inform_pg_tab
 
 ### Plotting: raw data
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 #visualising: raw data
 
@@ -938,7 +965,7 @@ ggplot(imprint_df, aes(x = factor(version), y = PG_value)) +
 
 ### Plotting: model predictions
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 #visualising the findings: model predictions
 
@@ -975,6 +1002,12 @@ check_model(ainform_pg)
 
 ## Hypothesis 1a, outcome: persuasion knowledge {.tabset}
 
+Did the presence of a digital imprint with a piece of campaign material increase participant awareness that the material was trying to persuade them of a certain viewpoint?
+
+- Outcome: PK, numerical 1-7
+- Predictor: version, binary factor
+- Random effects: id and advert
+
 ### Model
 
 ```{r persuasion knowledge actual informedness}
@@ -987,7 +1020,7 @@ ainform_pk <- lmer(PK ~ version + (1|id) + (1|advert), data = imprint_df)
 
 ### Model outcomes: table
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 #Visualising the findings: table
 
@@ -1002,7 +1035,7 @@ inform_pk_tab
 
 ### Plotting: raw data
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 ggplot(imprint_df, aes(x = factor(version), y = PK)) +
   geom_jitter(width = 0.2, alpha = 0.5) +
@@ -1014,7 +1047,7 @@ ggplot(imprint_df, aes(x = factor(version), y = PK)) +
 
 ### Plotting: model predictions
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 #visualising the findings: model predictions
 
@@ -1042,10 +1075,11 @@ Did viewing a digital imprint with a piece of campaign material increase partici
 To test this, each correct campaign name can be tested one by one with a logistical regression model to see if viewing the imprint boosted recall of the name. For this measure, there will therefore be 4 models and corresponding visualisations. This also uses the independent measures data frame with only one row per participant: training_df.
 
 Correct names:
-- Advert 1: Common sense collective: CSC 
-- Advert 2: Breaking barriers alliance: BBA
-- Advert 3: Speak freely inc: SFI
-- Advert 4: Campaign for a better Britain: CBB
+
+-   Advert 1: Common sense collective: CSC 
+-   Advert 2: Breaking barriers alliance: BBA
+-   Advert 3: Speak freely inc: SFI
+-   Advert 4: Campaign for a better Britain: CBB
 
 This analysis also will tell us something about how the imprint impacted recall for each advert differently. If imprints only increase recall on some adverts and not others, this may be related to the formatting and aesthetic features of the post itself e.g., how obvious the campaign name was, or even how memorable the name was. To find evidence that supports digital imprints consistently increase recall, regardless of the formatting of the imprint, we should expect to consistently see higher recall across four campaign group names when an imprint is present.
 
@@ -1127,7 +1161,7 @@ list2env(model_tables, envir = .GlobalEnv)
 
 ```
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 # Function to change the column names 
 
@@ -1175,7 +1209,7 @@ kable(SFI_recall, format = "html", digits = 2, caption = "Recall of Speak Freely
 
 ### Plotting: Raw data
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 csc_raw <- ggplot(training_df, aes(x = factor(Advert.1, labels = c("no imprint", "imprint")), fill = factor(CSC, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
   geom_bar(position = "stack", width = 0.2) +
@@ -1240,32 +1274,109 @@ composite_plot
 
 Do participants more correctly recall that 2 of the pieces of material included imprints when they were trained of thier purpose (and primed to notice them)?
 
+- Outcome: recall_correct
+- Predictor: Training.condition
+
 ### Model
 
-```{r}
+```{r, warning=FALSE}
+
+#A previously created function is used to fit the model: glm(correct_recall ~ Training.condition, data = training_df, family = binomial())
+
+num_recall_table <- fit_and_summarize_model("recall_correct", "Training.condition", training_df)
 
 ```
 
-
 ### Table
+
+```{r, echo=FALSE, fig.align='center'}
+
+kable(num_recall_table, format = "html", digits = 2, caption = "Effect of the training condition on reducing incorrect recall of the number of posts with imprints") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+```
 
 ### Plotting: Raw data
 
-### Plotting: Model predictions
+```{r, echo=FALSE, fig.align='center'}
+
+num_recall_raw <- ggplot(training_df, aes(x = factor(Training.condition, labels = c("not trained", "trained")), fill = factor(recall_correct, levels = c("incorrect", "correct"), labels = c("incorrect recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Training condition", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1")
+
+num_recall_raw
+
+```
+
+### Model assumptions
+
 
 
 ## Hypothesis 2a: outcome: correct name recall {.tabset}
 
 Did participants recall a higher number of correct campaigner names when they are trained to pay attention to the source?
 
+Outcome: name_correct, numerical 0-3
+predictor: Training.condition
+
 ### Model
+
+```{r}
+
+correct_name <- lm(name_correct ~ Training.condition, data = training_df)
+
+```
 
 ### Table
 
+```{r, echo=FALSE, fig.align='center'}
+
+correct_name_tab <- tab_model(correct_name, 
+                           pred.labels = c("Intercept", "Trained"),
+                           dv.labels = "Number of names correctly recalled")
+
+correct_name_tab
+
+```
+
 ### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = factor(Training.condition), y = name_correct)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Training condition", y = "Correct name recall", title = "Distribution of correct name recall by training condition") +
+  theme_minimal()
+
+```
 
 ### Plotting: Model predictions
 
+```{r, echo=FALSE, fig.align='center'}
+
+# Generate predicted values using the ggeffects package
+correct_name_preds <- ggpredict(correct_name, terms = "Training.condition")
+
+ggplot(correct_name_preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Training condition", y = "Predicted correct name recall (95% CI)", 
+       title = "Predicted effect of training condition on correct name recall") +
+  ylim(0, 3) +
+  theme_minimal()
+
+```
+
+### Assumptions
+
+```{r}
+
+check_model(correct_name)
+
+```
 
 ## Hypothesis 2b: outcome: perceived informedness {.tabset}
 
@@ -1285,7 +1396,7 @@ inform_training <- lmer(informed ~ Training.condition + version + Training.condi
 
 ### Table
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 inform_train_tab <- tab_model(inform_training, 
                            pred.labels = c("Intercept", "Training", "Digital Imprint 
@@ -1298,7 +1409,7 @@ inform_train_tab
 
 ### Plotting: Raw data
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 # Calculate summary statistics
 summary_stats <- imprint_df %>%
@@ -1327,7 +1438,7 @@ pi_plot +
 
 ### Plotting: Model predictions
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
 
 preds <- ggpredict(inform_training, terms = c("Training.condition", "version"))
 
@@ -1342,7 +1453,8 @@ plot(preds) +
 
 ### Assumptions
 
-## Hypothesis 2c: outcome: correct versus incorrect recall
+
+## Hypothesis 2c: outcome: correct versus incorrect recall {.tabset}
 
 Does percieved informedness correlate with actual informedness? How is percieved informedness impacted by the training condition?
 
@@ -1350,9 +1462,63 @@ This hypothesis has already partly been tested by previous models. For example, 
 
 However, we can further test whether the training condition caused participants to be more confident in how informed they were, but less accurate. This is by using the responses from the name recall measure, where participants were given a multiple choice of many names and were asked to identify the campaign names of the posts they viewed. Four were correct, and a higher number of correct name identification suggests increased informedness about the source. However, those who were trained might just feel more confident that they are informed and therefore more likely to select a number of names from the list. As four of the names were incorrect, to check for this we can test whether the training condition increased the number of incorrect names identified - this indicates increased confidence, but lower accuracy.
 
+### Model
+
+- Outcome: name_incorrect, numerical 0-4
+- Predictor: Training.condition
+
 ```{r}
 
+incorrect_name <- lm(name_incorrect ~ Training.condition, data = training_df)
 
+```
+
+### Table
+
+```{r, echo=FALSE, fig.align='center'}
+
+incorrect_name_tab <- tab_model(incorrect_name, 
+                           pred.labels = c("Intercept", "Trained"),
+                           dv.labels = "Number of names incorrectly recalled")
+
+incorrect_name_tab
+
+```
+
+### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = factor(Training.condition), y = name_incorrect)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Training condition", y = "Incorrect name recall", title = "Distribution of incorrect name recall by training condition") +
+  theme_minimal()
+
+```
+
+### Plotting: Model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Generate predicted values using the ggeffects package
+incorrect_name_preds <- ggpredict(incorrect_name, terms = "Training.condition")
+
+ggplot(incorrect_name_preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Training condition", y = "Predicted incorrect name recall (95% CI)", 
+       title = "Predicted effect of training condition on incorrect name recall") +
+  ylim(0, 3) +
+  theme_minimal()
+
+```
+
+### Assumptions
+
+```{r}
+
+check_model(incorrect_name)
 
 ```
 
@@ -1371,21 +1537,87 @@ To further explore this, we can conduct an analysis comparing the effect of view
 
 ### Persuasion knowledge
 
-```{r advert level variations in PK}
+```{r advert level variations in PK, echo=FALSE, fig.align='center'}
 
-#show one error bar chart that plots the distibution of responses for persuasion knowledge and political goal recognition, plotting imprint viewed and imprint not viewed seperately. 
+# Calculate summary statistics
+summary_ad_PK <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_pk = mean(PK, na.rm = TRUE),
+            sd_pk = sd(PK, na.rm = TRUE),
+            se_pk = sd_pk / sqrt(n),
+            ci_upper = mean_pk + 1.96 * se_pk,
+            ci_lower = mean_pk - 1.96 * se_pk) %>%
+  ungroup()
+
+kable(summary_ad_PK, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved persuasion knowledge") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_PK_plot <- ggplot(data = imprint_df, aes(x = advert, y = PK, fill = version)) 
+
+ad_PK_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
 
 ```
 
 ### Political goal recognition
 
-```{r advert level variations in PG}
+```{r advert level variations in PG, echo=FALSE, fig.align='center'}
+
+# Calculate summary statistics
+summary_ad_PG <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_pg = mean(PG_value, na.rm = TRUE),
+            sd_pg = sd(PG_value, na.rm = TRUE),
+            se_pg = sd_pg / sqrt(n),
+            ci_upper = mean_pg + 1.96 * se_pg,
+            ci_lower = mean_pg - 1.96 * se_pg) %>%
+  ungroup()
+
+kable(summary_ad_PG, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved political goal") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_PG_plot <- ggplot(data = imprint_df, aes(x = advert, y = PG_value, fill = version)) 
+
+ad_PG_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
 
 ```
 
 ### Informedness
 
-```{r advert level variations in informed}
+```{r advert level variations in informed, echo=FALSE, fig.align='center'}
 
+# Calculate summary statistics
+summary_ad_in <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_in = mean(informed, na.rm = TRUE),
+            sd_in = sd(informed, na.rm = TRUE),
+            se_in = sd_in / sqrt(n),
+            ci_upper = mean_in + 1.96 * se_in,
+            ci_lower = mean_in - 1.96 * se_in) %>%
+  ungroup()
+
+kable(summary_ad_in, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved informedness") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_in_plot <- ggplot(data = imprint_df, aes(x = advert, y = informed, fill = version))
+
+ad_in_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
 
 ```

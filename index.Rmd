@@ -823,7 +823,8 @@ Research question 1:
 Research question 2:
 
 - H2a: Those who are informed about the purpose of digital imprints will be more informed about the source of a piece of campaign material when it contains an imprint (actual informedness), and will be more confident in their ability to identify them (perceived informedness).
-- H2b: Having been told about the purpose of an imprint will increase the perception that campaign laws are sufficient compared to those who have not been told about the purpose.
+- H2b: Those who are informed about the purpose of digital imprints will use this knowledge in their evaluations of the trustworthiness and credibility of campaign content.
+- H2c: Having been told about the purpose of an imprint will increase the perception that campaign laws are sufficient compared to those who have not been told about the purpose.
 
 Research question 3:
 
@@ -883,20 +884,63 @@ Perceived informedness:
 -   **Incorrect recall of the campaign groups names**, numerical scale 0-4, number of incorrect campaign groups recalled.
 -   **Confidence in transparency recall**, binary variable: those who chose 'not sure' = 0, those who gave a number between 0 and 4 = 1.
 
+### Outcome 2: trustworthiness/credibility
 
-### Outcome 2: trustworthiness
+Tested in this experiment is whether the two experimental manipulations impact how trustworthy and credible the posts are perceived to be. Although different concepts, they correlate highly with each other and are measured using semantic differentials. Hypothesis 1b expects the presence of an imprint with a piece of material to not impact the perceived trustworthiness/credibility of an campaign post. However, hypothesis 2b predicts that when participants are informed explicitly about the imprints they will use it to determine trustworthiness: when a digital imprint is absent, the post will be perceived as less trustworthy, and when a digital imprint is present more trustworthy. 
 
+This expectation for H2b may also be mediated by the perceived political nature of the post, as the knowledge of the legislation is contingent on recognising that the post is political material that would require an imprint.
 
+#### Measurements of trustworthiness/credibility
 
-#### Measurements of trustworthiness
+Trustworthiness/credibility is measured using semantic differentials taken from Bruns et al, 2023:
+
+- Accuracy: numerical scale 1-7, ‘inaccurate’ – ‘accurate’, 
+- Believability: numerical scale 1-7, ‘unbelievable’ – ‘believable’
+- Factuality: numerical scale 1-7,‘opinionated’ – ‘factual’
+- trustworthiness: numerical scale 1-7, ‘untrustworthy’ – ‘trustworthy’ 
 
 ### Outcome 3: confidence in regulatory oversight
 
+Tested is whether explicit knowledge of the purpose of digital imprints increases the perception that regulatory oversight for political advertising is sufficient. Hypothesis 2c expects that this will be the case, with a higher mean value for regulation confidence in the training group compared to those who did not receive training.
+
 #### Measurements of regulatory confidence
+
+- Regulation sufficiency: numerical scale 1-7
 
 ### Outcome/predictor 4: usefulness rankings
 
+Participants are asked to rank 6 options - including an 'other' option where they can input text - in order of who the information contained on a digital imprint is most useful to. 
+
 #### Measurement of usefulness ranking
+
+Each response obtains a number indicating the rated position for each participant.
+
+Rank options:
+
+- Voters
+- The Electoral Commission
+- Academic researchers
+- Journalists
+- The Police
+- Other
+
+### Control variables
+
+*Need to add left-right wing orientation into qualtrics*
+*Do we want to capture ethnicity as a demographic measure?*
+
+Demographic and political interest, knowledge and support measures are also captured to be included as controls in the model:
+
+- Knowledge of existing regulation
+- Political party identification
+- Age
+- Gender
+- Education
+- Institutional trust
+- Satisfaction with democracy
+- Political interest
+- Political efficacy
+- Social media use and frequency
 
 ## Analysis plan: hypothesis 1a and 1b
 
@@ -1362,6 +1406,142 @@ ad_in_plot +
   theme_minimal()
 
 ```
+
+### Hypothesis 1b: outcome: accuracy, beleivability, factualness, trustworthiness {.tabset}
+
+#### Models
+
+The models below are created through a function
+
+- model_accurate_value <- lmer(accurate_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_believable_value <- lmer(believable_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_factual_value <- lmer(factual_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_trustworthy_value <- lmer(trustworthy_value ~ version + (1|id) + (1|advert), data = imprint_df)
+
+```{r, include=FALSE}
+
+#function to create the models for each of the four outcomes
+
+fitMixedModel <- function(outcome, data) {
+  # Construct the formula string dynamically
+  formulaString <- paste(outcome, "~ version + (1|id) + (1|advert)", sep = " ")
+  # Convert the string to a formula
+  modelFormula <- as.formula(formulaString)
+  # Fit the model
+  model <- lmer(modelFormula, data = data)
+  # Construct a name for the model variable based on the outcome
+  modelName <- paste("model_", outcome, sep = "")
+  # Assign the model to the global environment
+  assign(modelName, model, envir = .GlobalEnv)
+}
+
+outcomes <- c("accurate_value", "believable_value", "factual_value", "trustworthy_value")
+
+lapply(outcomes, fitMixedModel, data = imprint_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+#Cannot create a function for this that doesn't output the tables as a new tab in a browser, rather than embedded in the knitted document. Also cannot centralise the tables in the knitted document. This will do for now.
+
+accuracy_tab <- tab_model(model_accurate_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved accuracy")
+
+believable_tab <- tab_model(model_believable_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved believability")
+
+factual_tab <- tab_model(model_factual_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved factualness")
+
+trustworthy_tab <- tab_model(model_trustworthy_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved trustworthiness")
+
+accuracy_tab 
+believable_tab 
+factual_tab 
+trustworthy_tab
+  
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+long_trust_measures <- pivot_longer(imprint_df, 
+                                cols = c(accurate_value, believable_value, 
+                                         factual_value, trustworthy_value), 
+                                names_to = "outcome", 
+                                values_to = "value")
+
+ggplot(long_trust_measures, aes(x = outcome, y = value, fill = version)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Outcomes by Version",
+       x = "outcome",
+       y = "Distrubution of response") +
+  theme(axis.text.x = element_text(hjust = 1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+pred_accurate <- ggpredict(model_accurate_value, terms = "version")
+pred_believable <- ggpredict(model_believable_value, terms = "version")
+pred_factual <- ggpredict(model_factual_value, terms = "version")
+pred_trustworthy <- ggpredict(model_trustworthy_value, terms = "version")
+
+ggplot(pred_accurate, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted accuracy value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived accurateness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_believable, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted believable value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived believability of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_factual, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted factual value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived factualness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_trustworthy, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted trustworthy value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived trustworthiness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+```
+
+
+#### Assumptions: accurate
+
+#### Assumptions: believable
+
+#### Assumptions: factual
+
+#### Assumptions: trustworthy
+
 
 ## Analysis plan: hypothesis 2a and 2b
 

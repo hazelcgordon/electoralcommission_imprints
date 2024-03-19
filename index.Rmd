@@ -1543,7 +1543,7 @@ ggplot(pred_trustworthy, aes(x = x, y = predicted)) +
 #### Assumptions: trustworthy
 
 
-## Analysis plan: hypothesis 2a and 2b
+## Analysis plan: hypothesis 2a, 2b and 2c
 
 Models tested under hypothesis 2a:
 
@@ -1679,7 +1679,7 @@ inform_training <- lmer(informed ~ Training.condition + version + Training.condi
 
 #### Table
 
-```{r, echo=FALSE, fig.align='center'}
+```{r, echo=FALSE}
 
 inform_train_tab <- tab_model(inform_training, 
                            pred.labels = c("Intercept", "Training", "Digital Imprint 
@@ -1804,4 +1804,93 @@ check_model(incorrect_name)
 
 ```
 
+### Hypothesis 2b: outcome: accuracy, believablity, factualness, trustworthiness {.tabset}
+
+Did those informed about the purpose of imprints use their absense/presence to evaluate the trustworthiness and credibility of the posts? 
+
+*These measures will all be analysed in the same way as hypothesis 2a: outcome: perceived informedness, with an interaction effect between the training condition and the version of the advert viewed.*
+
+- Outcome: accurate/factual/believable/trustworthy, numerical 1-7
+- fixed effect: training condition x version of imprint viewed (interaction effect)
+- random effects: id and advert
+
+#### Models
+
+*Currently unfinished*
+
+### Hypothesis 2c: outcome: confidence in regulation {.tabset}
+
+Does being informed explicitly about the purpose of digital imprints and their relation to regulatory compliance increase perceptions that political advertising is sufficiently regulated in the UK?
+
+This model uses the training_df dataframe.
+
+- Outcome: confidence in regulation, numerical 1-7
+- Predictor: training condition
+
+#### Model
+
+```{r}
+
+regulation_model <- lm(election_reg ~ Training.condition, data = training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+regulation_tab <- tab_model(regulation_model, 
+                           pred.labels = c("Intercept", "Trained"),
+                           dv.labels = "Perceived sufficiency of advertising 
+                           regulation")
+
+regulation_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = factor(Training.condition), y = election_reg)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Training condition", y = "Regulation confidence", title = "Distribution of regulation confidence by training condition") +
+  theme_minimal()
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Generate predicted values using the ggeffects package
+regulation_preds <- ggpredict(regulation_model, terms = "Training.condition")
+
+ggplot(regulation_preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Training condition", y = "Predicted regulation confidence (95% CI)", 
+       title = "Predicted effect of training condition on regulation confidence") +
+  ylim(1, 7) +
+  theme_minimal()
+
+```
+
 ## Analysis plan: hypothesis 3
+
+### Hypothesis 3: outcome: rank position {.tabset}
+
+Who did participants rank the digital imprint as most useful to out of the options?
+
+#### Table
+
+#### Plotting: frequency
+
+```{r}
+
+
+
+```
+
+

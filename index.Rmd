@@ -1,5 +1,5 @@
 ---
-title: "Experiment testing the impact of digital imprints on organic campaign material"
+title: "Experiment testing the impact of digital imprints on organic campaign material: analysis plan generated from pilot study data"
 author: 
 -   name: Kate Dommett
 -   name: Tom Stafford
@@ -805,6 +805,10 @@ rm(list=setdiff(ls(), c("data", "imprint_df", "training_df")))
 
 This document relies on the correct data frames having been formed from the code above which can be viewed under 'details'. This information is also stored in a seperate R Markdown document 'datawrangling_code.Rmd'. The correct data frames used in the following analyses are called: imprint_df and training_df. Some hypotheses are tested using the former dataframe, which includes four rows for each participant to capture the repeated measures part of the experiment. Some hypotheses are tested using the latter dataframe, which includes only one row per participant.
 
+### Document purpose
+
+The purpose of this document is to develop an analysis plan from the pilot data before the main dataset is collected. The pilot results themselves are not interpreted or used, rather the models and visualisations have been created to increase clarity on how the measures address the hypotheses, and how the hypotheses address the research question. Faults in the pilot survey are also checked for.
+
 ### Research questions
 
 **Research question 1**: What is the effect of viewing an imprint on perceptions of the content and how informed a citizen is about the campaigners that target them with online political advertising?
@@ -932,11 +936,13 @@ Rank options:
 
 ### Control variables
 
-*Need to add left-right wing orientation into qualtrics*
+*Need to add left-right wing orientation into qualtrics.*
+
 *Do we want to capture ethnicity as a demographic measure?*
 
 Demographic and political interest, knowledge and support measures are also captured to be included as controls in the model:
 
+- Agreement with the content of the campaign post
 - Knowledge of existing regulation
 - Political party identification
 - Age

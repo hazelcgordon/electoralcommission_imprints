@@ -811,7 +811,7 @@ This document relies on the correct data frames having been formed from the code
 
 **Research question 2**: What is the effect of having explicit knowledge about the purpose of digital imprints and their relation to regulatory compliance on the evaluation of campaign content, how informed a citizen is about the campaigners that target them with online advertising, and confidence in regulatory oversight?
 
-**Research question 3**: Do citizens view information made transparent as relevant and useful for the self or for others, and how does this perception affect their trust in campaign material overall?
+**Research question 3**: Do citizens view information made transparent as relevant and useful for the self or for others, and how does this perception affect their trust in campaign material and confidence in regulatory oversight?
 
 ### Hypotheses
 
@@ -828,7 +828,7 @@ Research question 2:
 
 Research question 3:
 
-- H3: Respondents who view an imprint to be intended for another actor (not themselves) will exhibit higher levels of trust in campaign material compared to those who view the information as relevant to the self.
+- H3: Respondents who view an imprint to be intended for another actor (not themselves) will exhibit higher levels of trust in campaign material and electoral oversight compared to those who view the information as relevant to the self.
 
 ### Outcome 1: informedness
 
@@ -911,9 +911,15 @@ Tested is whether explicit knowledge of the purpose of digital imprints increase
 
 Participants are asked to rank 6 options - including an 'other' option where they can input text - in order of who the information contained on a digital imprint is most useful to. 
 
+This measure is used to understand how voters interpret the relevance of such information to their own evaluations.
+
+It is additionally theorised this measure can capture distinctions between direct and indirect transparency perceptions. When citizens perceive transparent information as useful to others, they are theorised to express more trust in the campaign material they view overall and higher confidence in regulatory oversight for political advertising.
+
+On the other hand, as digital imprints alone are fairly uninformative about the kinds of information voters might want to learn, such as detailed financial records of campaign sponsors and ideological biases, voters who perceive this information as relevant to the self may express lower trust in campaign material overall and lower confidence in regulatory oversight.
+
 #### Measurement of usefulness ranking
 
-Each response obtains a number indicating the rated position for each participant.
+Each response obtains a number indicating the rated position for each participant. All are numerical ranging from 1-6.
 
 Rank options:
 
@@ -1407,7 +1413,13 @@ ad_in_plot +
 
 ```
 
-### Hypothesis 1b: outcome: accuracy, beleivability, factualness, trustworthiness {.tabset}
+### Hypothesis 1b: outcome: accuracy, believability, factualness, trustworthiness {.tabset}
+
+Did the inclusion of a digital imprint influence how trustworthy and credible the posts were perceived to be?
+
+Outcome: accurate/believable/factual/trustworthy, numerical scale 1-7
+Fixed effects: Version of post viewed, binary
+Random effects: id and advert
 
 #### Models
 
@@ -1883,14 +1895,210 @@ ggplot(regulation_preds, aes(x = x, y = predicted)) +
 
 Who did participants rank the digital imprint as most useful to out of the options?
 
-#### Table
+Options:
+
+- useful_rank_1 = Voters
+- useful_rank_2 = The Electoral Commission
+- useful_rank_3 = Academic researchers
+- useful_rank_4 = Journalists
+- useful_rank_5 = The Police
+- useful_rank_6 = Other
 
 #### Plotting: frequency
 
-```{r}
+```{r, echo=FALSE, fig.align='center'}
 
+#create long data for each of the response options
 
+long_useful_measures <- pivot_longer(training_df, 
+                                cols = c(useful_rank_1, useful_rank_2, useful_rank_3,
+                                         useful_rank_4, useful_rank_5, useful_rank_6
+                                         ), 
+                                names_to = "ranking", 
+                                values_to = "option")
+
+#rename the categories within ranking and order
+
+long_useful_measures <- long_useful_measures %>%
+  mutate(ranking = recode(ranking, 
+         useful_rank_1 = "Voters",
+         useful_rank_2 = "The Electoral Commission",
+         useful_rank_3 = "Academic researchers",
+         useful_rank_4 = "Journalists",
+         useful_rank_5 = "The Police",
+         useful_rank_6 = "Other"),
+         ranking = factor(ranking, levels = c("Voters", 
+                                              "The Electoral Commission", 
+                                              "Academic researchers", 
+                                              "Journalists", 
+                                              "The Police", 
+                                              "Other")))
+
+#Plotting a bubble chart for frequency visualistion
+
+long_useful_freq <- long_useful_measures %>%
+  group_by(ranking, option) %>%
+  summarise(count = n(), .groups = 'drop')
+
+ggplot(long_useful_freq, aes(x = ranking, y = option, size = count)) +
+  geom_point(colour = "sienna3") + 
+  scale_fill_brewer(palette = "Spectral") + # Color palette for fill
+  scale_size_continuous(range = c(3, 12)) + # Adjust bubble sizes as needed
+  labs(title = "Rank Ordering of Options",
+       x = "Category",
+       y = "Rank",
+       size = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45)) +
+  scale_y_reverse()
 
 ```
 
+#### Plotting: boxplots
+
+This will plot the distribution across each of the 6 response options.
+
+```{r, echo=FALSE, fig.align='center'}
+
+#plot the distribution
+
+ggplot(long_useful_measures, aes(x = ranking, y = option)) +
+  geom_boxplot(width = 0.3) +
+  theme_minimal() +
+  labs(title = "Distrubution of ranking",
+       x = "Category",
+       y = "Distrubution of response") +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45))
+
+```
+
+### Hypothesis 3: outcome: trustworthiness {.tabset}
+
+Did perceiving digital imprints as useful to other agents, as opposed to the self, increase overall perceived trustworthiness of the campaign material?
+
+As a predictor, the higher the number for useful_rank_1 the less useful the information made transparent was perceived to be to the self/voters.
+
+- Outcome: trustworthy, numerical 1-7
+- Fixed effect: useful_rank_1, numerical 1-6
+- Random effects: id and advert
+
+#### Model
+
+```{r}
+
+useful_trust_model <- lmer(trustworthy_value ~ useful_rank_1 + + (1|id) + (1|advert), 
+                           data = imprint_df)
+
+```
+
+#### Table
+
+The rank position coefficient predicts the effect of perceiving the usefulness of the information as incrementally less relevant to the self/voter. The higher the number of the measure, the less useful this information was seen to be for the self. If the hypothesis were supported, we would expect to see a positive coeffecient.
+
+```{r, echo=FALSE}
+
+useful_trust_tab <- tab_model(useful_trust_model,
+          pred.labels = c("Intercept", "Rank position"),
+          dv.labels = "Percieved trustworthiness of campaign material")
+
+useful_trust_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(data=imprint_df, aes(x=useful_rank_1, y=trustworthy_value)) +
+  geom_point() +
+  geom_jitter() +
+  geom_smooth(method = lm, se=FALSE) +
+  theme_minimal() +
+  labs(
+    title = "Association between rank position and perceived trustworthiness of the \n campaign material",
+    x = "Rank position of 'voter' (1 = most useful to)",
+    y = "Percieved trustworthiness"
+  ) +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+useful_trust_preds <- ggpredict(useful_trust_model, terms="useful_rank_1")
+
+ggplot(useful_trust_preds, aes(x = x, y = predicted)) +
+  geom_line(aes(y = predicted), color = "blue") +
+  geom_ribbon(aes(ymin = predicted - std.error, ymax = predicted + std.error), fill = "lightgrey", alpha = 0.2) +
+  ylim(1, 7) +
+  scale_x_continuous(breaks = seq(1, 6, by=1)) +
+  theme_minimal() +
+  labs(x = "Rank position of voter (1 = most useful to)", y = "Predicted trustworthiness", 
+       title = "Predicted effect of voter rank position on perceived trustworthiness of \n campaign material") 
+
+```
+
+
+### Hypothesis 3: outcome: regulation confidence {.tabset}
+
+Is perceiving the usefulness of digital imprints as useful to other agents, as opposed to the self, associated with higher regulation confidence?
+
+- Outcome: regulation confidence, numerical 1-7
+- Predictor: useful_rank_1, numerical 1-6
+
+#### Model
+
+```{r}
+
+useful_reg_model <- lm(election_reg ~ useful_rank_1, data = training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+useful_reg_tab <- tab_model(useful_reg_model, 
+                           pred.labels = c("Intercept", "Rank of 'voter'"),
+                           dv.labels = "Perceived sufficiency of advertising 
+                           regulation")
+
+useful_reg_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = useful_rank_1, y = election_reg)) +
+  geom_point() +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_smooth(method=lm, se = FALSE) +
+  labs(x = "Rank position of 'voter' (1 = most useful to)", 
+       y = "Regulation confidence", 
+       title = "Association between rank position of voter and regulation confidence") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(1, 6, by=1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+useful_reg_preds <- ggpredict(useful_reg_model, terms="useful_rank_1")
+
+ggplot(useful_reg_preds, aes(x = x, y = predicted)) +
+  geom_line(aes(y = predicted), color = "blue") +
+  geom_ribbon(aes(ymin = predicted - std.error, ymax = predicted + std.error), fill = "lightgrey", alpha = 0.2) +
+  ylim(1, 7) +
+  scale_x_continuous(breaks = seq(1, 6, by=1)) +
+  theme_minimal() +
+  labs(x = "Rank position of voter (1 = most useful to)", y = "Predicted regulation confidence", 
+       title = "Predicted effect of voter rank position on regulation confidence") 
+
+```
 

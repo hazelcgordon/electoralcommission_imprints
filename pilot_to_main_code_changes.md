@@ -14,10 +14,10 @@ In the process of creating the analysis plan, some mistakes were spotted in the 
 
 The following lists the changes that will be made to the data wrangling code once the issues with the qualtrics survey have been corrected to process the main dataset:
 
-[] Add in code to deal with exclusions
-[] When forming new data frames, include left-right ideology measure
-[] Delete the unused agree-disagree response option transformation function
-[] Add in code to transform left-right ideology measure under 'variable transformations'
-[] Convert left-right ideology to numeric
-[] Delete institutional trust unused text '0 - none at all' function
-[] Check and potentially change the control variables added into the imprint_df dataframe to ensure all are present in it
+- [] Add in code to deal with exclusions
+- [] When forming new data frames, include left-right ideology measure
+- [] Delete the unused agree-disagree response option transformation function
+- [] Add in code to transform left-right ideology measure under 'variable transformations'
+- [] Convert left-right ideology to numeric
+- [] Delete institutional trust unused text '0 - none at all' function
+- [] Check and potentially change the control variables added into the imprint_df dataframe to ensure all are present in it

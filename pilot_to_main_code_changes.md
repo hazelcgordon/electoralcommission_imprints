@@ -8,6 +8,38 @@ In the process of creating the analysis plan, some mistakes were spotted in the 
 - Left-right wing self-identification was missed off in the demographic information section of the survey.
 - The response options for the institutional trust measures including unecessary text information '0 - none at all'.
  - This is changes to just '0' on qualtrics, removing the need for the function to transform this response option.
+ 
+## Discussion about the control variables to be included, 21st March 2024
+
+### Control variables
+
+I a meeting in March, the team discussed needing justifications for the control variables we include. I had a look through other disclaimer research, finding a lot don't include controls. However, the Dobber, Kreukemeier et al 2023 (the effect of traffic light veracity labels) include age, gender and political interest.
+
+Dobber et al 2023 (shielding citizens) alternatively collected age, gender and political interest information to check for successful randomisation into conditions, but not as controls in the model. So it would make sense to use the control variables in this way as well.
+
+In our study I think there is still good reason to include a few specific controls due to the high real life validity of our content, which means we have less control over some aspects compared to other studies. However, there would need to be a strong rationale for how each control relates to the experimental stimuli.
+
+Aspects to consider:
+
+- **Agreement with content**: needed as agreement/political alignment is a strong predictor of campaign content evaluation
+- **Political party identification**: another measure of political alignment that would be useful in understanding loyalty to the conservative party, who are criticised in the posts
+- **Social media frequency of use**: this might impact familiarity with the aesthetic layout which could make the content easier to navigate for some participants compared to others, impacting how easily they can identify the imprint - in this case we would only need to capture frequency of Facebook use.
+- **Trust in Facebook as a platform**: not currently in the list, but this could be expected to impact participants' evaluations of the content, particularly when evaluating trust. For example, some people might think 'can't trust anything you see on Facebook'.
+- **Age, gender, education, political interest, regulation knowledge**: included in the survey to check for successful randomisation across conditions, but not used as controls in the models.
+
+My suggestion would be to check each model with the following controls: 
+
+- Agreement
+- Conservative party support (as a binary variable)
+- Facebook use frequency
+- Trust in Facebook
+
+If we went with these suggestions, I would remove from the survey:
+
+- Institutional trust
+- Social media use and frequency for all but Facebook
+
+Ethnicity and left-right political ideology would also not be added to qualtrics.
 
 
 ## To do

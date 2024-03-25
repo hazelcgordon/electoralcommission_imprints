@@ -736,7 +736,7 @@ control_measures <- data %>%
 imprint_df <- repeated_measures %>%
   left_join(control_measures, by = "id")
 
-#changing the order of columns: ADD IN RECALL NAME AND NUM VARIABLES
+#changing the order of columns
 
 imprint_df <- imprint_df %>%
   select(id, Advert.1, Advert.2, Advert.3, Advert.4, Training.condition, advert, version, PK, informed, PG_value, agree_value, trustworthy_value, believable_value, accurate_value, factual_value, recall_num, recall_correct, recall_answer, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, useful_rank_1, political_interest, reg_know, SM_use, SM_frequency_1, partyID, age, gender, education, everything())
@@ -809,30 +809,61 @@ This document relies on the correct data frames having been formed from the code
 
 The purpose of this document is to develop an analysis plan from the pilot data before the main dataset is collected. The pilot results themselves are not interpreted or used, rather the models and visualisations have been created to increase clarity on how the measures address the hypotheses, and how the hypotheses address the research question. Faults in the pilot survey are also checked for.
 
-### Research questions
+### Research themes and questions
 
-**Research question 1**: What is the effect of viewing an imprint on perceptions of the content and how informed a citizen is about the campaigners that target them with online political advertising?
+Research theme 1: the effect of viewing a digital imprint on subsequent evaluations
 
-**Research question 2**: What is the effect of having explicit knowledge about the purpose of digital imprints and their relation to regulatory compliance on the evaluation of campaign content, how informed a citizen is about the campaigners that target them with online advertising, and confidence in regulatory oversight?
+- **Research question 1a**: Does the presence of a digital imprint increase citizens knowledge about the source of digital campaign material?
+- **Research question 1b**: Does the presence of a digital imprint increase the perceived trustworthiness of the campaign material?
 
-**Research question 3**: Do citizens view information made transparent as relevant and useful for the self or for others, and how does this perception affect their trust in campaign material and confidence in regulatory oversight?
+Research theme 2: the effect of being informed about the purpose of digital imprints on subsequent evaluations
+
+- **Research question 2a**: How does being informed about the purpose of digital imprints affect citizens' knowledge of the source of campaign material?
+- **Research question 2b**: How does being informed about the purpose of digital imprints affect citizens' perceptions of the trustworthiness of such material?
+- **Research question 2c**: How does being informed about the purpose of a digital imprint affect citizen views on the sufficiency of current regulatory oversight?
+
+Research theme 3: citizen perceptions of direct and indirect transparency on citizen evaluations
+
+- **Research question 3a**: Do citizens view information transparency information useful for the self and for others? 
+- **Research question 3b**: Does the perception of how useful transparency information is to the self affect citizen trust in campaign material and confidence in regulatory oversight?
 
 ### Hypotheses
 
-Research question 1:
+Research question 1a:
 
-- H1a: Imprints will not increase respondent’s knowledge about the source of a piece of digital campaign material.
-- H1b: The presence of an ‘uninformative’ imprint on campaign material from a non-party campaign group will not affect the perceived trustworthiness of campaign material.
+- H1a: Digital imprints *will* increase respondents knowledge about the source of a piece of digital campaign material, with regards to the campaigners political and persuasive intent.
+- H1b: The presence of a digital imprint *will not* increase respondent’s memory of the names of campaigners whose post they viewed.
+- H1c: The presence of a digital imprint *will not* increase respondent’s perception that they are more informed about the source of campaign material.
 
-Research question 2:
+Research question 1b:
 
-- H2a: Those who are informed about the purpose of digital imprints will be more informed about the source of a piece of campaign material when it contains an imprint (actual informedness), and will be more confident in their ability to identify them (perceived informedness).
-- H2b: Those who are informed about the purpose of digital imprints will use this knowledge in their evaluations of the trustworthiness and credibility of campaign content.
-- H2c: Having been told about the purpose of an imprint will increase the perception that campaign laws are sufficient compared to those who have not been told about the purpose.
+- H2: The presence of a digital imprint that does not communicate partisan cues on campaign material from a non-party campaign group will not affect the perceived trustworthiness of the campaign material.
 
-Research question 3:
+Research question 2a:
 
-- H3: Respondents who view an imprint to be intended for another actor (not themselves) will exhibit higher levels of trust in campaign material and electoral oversight compared to those who view the information as relevant to the self.
+- H3a: Those who are informed about the purpose of digital imprints, thus are primed to notice their presence and understand their purpose, will pay more attention to the presence or absence of source transparency when evaluating a piece of campaign material.
+- H3b: Those who are informed about the purpose of digital imprints, thus are primed to notice their presence and understand their purpose, will pay more attention to the source of a campaign post.
+- H3c: Those who are informed about the purpose of digital imprints will perceive themselves as informed about the source of a piece of material *if and only if* a digital imprint is present with the content.
+- H3d: Those who are informed about the purpose of digital imprints will be more likely to both have confidence in their knowledge of the source, as well as recall this information with more accuracy.
+
+Research question 2b:
+
+- H4: Those who are informed about the purpose of digital imprints will perceive campaign content as more trustworthy *if and only if* a digital imprint is present with the content.
+
+Research question 2c:
+
+- H5: Those who are informed about the purpose of an imprint are more likely to perceive campaign laws as sufficient compared to those who are not informed about the purpose.
+
+Research question 3a:
+
+- H6: Individuals will vary in how relevant they perceive transparency information to be for voters (the self) or other actors.
+
+Research question 3b:
+
+- H7a: Variations in perceptions of the relevancy of campaign information will predict how trustworthy campaign materials are evaluated to be, with ranking transparency information as incrementally more useful to voters decreasing the likelihood campaign content will be perceived as trustworthy.
+- H7b: Variations in perceptions of the relevancy of campaign information will predict the perceived sufficiency of regulatory oversight, with ranking transparency information as incrementally more useful to voters decreasing the likelihood campaign regulation will be perceived as sufficient.
+
+## Outline of key measures
 
 ### Outcome 1: informedness
 
@@ -936,25 +967,35 @@ Rank options:
 
 ### Control variables
 
-*Need to add left-right wing orientation into qualtrics.*
-
-*Do we want to capture ethnicity as a demographic measure?*
-
 Demographic and political interest, knowledge and support measures are also captured to be included as controls in the model:
 
 - Agreement with the content of the campaign post
+
+Capturing agreement with the content of the post proxies political alignment and is necessary to include as political alignment is a strong predictor of trust in the content of advertisements. What is of interest is if digital imprints can have an effect on attitudes distinct from this.
+
 - Knowledge of existing regulation
+
+This control is relevant to the specific domain context, as perceptions of regulation are likely impacted by knowledge of regulation.
+
 - Political party identification
+
+This is another measure that captures political alignment.
+
+Other variables important in perceptions of political information are captured so that randomisation checks between conditions can be checked:
+
 - Age
 - Gender
 - Education
-- Institutional trust
 - Satisfaction with democracy
 - Political interest
 - Political efficacy
-- Social media use and frequency
+- Facebook use and frequency
 
-## Analysis plan: hypothesis 1a and 1b
+### Explanation of hypotheses
+
+## 
+
+## Analysis plan: hypothesis 1a, 1b and 1c
 
 <details>
 
@@ -1128,7 +1169,7 @@ ggplot(preds, aes(x = x, y = predicted)) +
 
 #### Model assumptions
 
-### Hypothesis 1a, outcome: recall of names {.tabset}
+### Hypothesis 1b, outcome: recall of names {.tabset}
 
 Did viewing a digital imprint with a piece of campaign material increase participants memory of the campaigner name?
 
@@ -1318,7 +1359,72 @@ composite_plot
 
 ```
 
-### Hypothesis 1a: consistency of digital imprint informedness effects {.tabset}
+### Hypothesis 1c: outcome: perceived informedness {.tabset}
+
+Did the presence of a digital imprint with a piece of campaign material increase participant's perception that they had been informed about the source of the content?
+
+- Outcome: informed, numerical 1-7
+- Predictor: version, binary factor
+- Random effects: id and advert
+
+#### Model
+
+```{r}
+
+inform_pi <- lmer(informed ~ version + (1|id) + (1|advert), data = imprint_df)
+
+```
+
+#### Model outcomes: table
+
+```{r, echo=FALSE, fig.align='center'}
+
+#Visualising the findings: table
+
+inform_pi_tab <- tab_model(inform_pi, 
+                           pred.labels = c("Intercept", "Digital Imprint 
+                                           included"),
+                           dv.labels = "Perceived informedness")
+
+inform_pi_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(imprint_df, aes(x = factor(version), y = informed)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Version of advert", y = "Perceived informedness", title = "Distribution of perceived informedness by version of ad viewed") +
+  theme_minimal()
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+#visualising the findings: model predictions
+
+# Generate predicted values using the ggeffects package
+preds <- ggpredict(inform_pi, terms = "version")
+
+ggplot(preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted perceived informedness value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived informedness") +
+  ylim(1, 7) +
+  theme_minimal()
+
+```
+
+#### Model assumptions
+
+
+### Supplementary check: advert level variations {.tabset}
 
 If hypothesis 1a is not supported and digital imprints are found to increase how informed an individual is, then advert level effects will be explored.
 
@@ -1419,7 +1525,9 @@ ad_in_plot +
 
 ```
 
-### Hypothesis 1b: outcome: accuracy, believability, factualness, trustworthiness {.tabset}
+## Analysis plan: hypothesis 2
+
+### Hypothesis 2: outcome: accuracy, believability, factualness, trustworthiness {.tabset}
 
 Did the inclusion of a digital imprint influence how trustworthy and credible the posts were perceived to be?
 
@@ -1561,17 +1669,9 @@ ggplot(pred_trustworthy, aes(x = x, y = predicted)) +
 #### Assumptions: trustworthy
 
 
-## Analysis plan: hypothesis 2a, 2b and 2c
+## Analysis plan: hypothesis 3a, 3b, 3c and 3d
 
-Models tested under hypothesis 2a:
-
-- The training condition will increase the respondents ability to identify when a campaigner has been compliant with electoral transparency law (actual informedness)
-
-- The training condition will increase perceived informedness, increasing respondents confidence and accuracy with which they can identify the source of a piece of digital campaign material and recognise regulatory compliance
-
-- Actual informedness will correlate with perceived informedness
-
-### Hypothesis 2a: outcome: number recall {.tabset}
+### Hypothesis 3a: outcome: number recall {.tabset}
 
 Do participants more correctly recall that 2 of the pieces of material included imprints when they were trained of thier purpose (and primed to notice them)?
 
@@ -1614,8 +1714,7 @@ num_recall_raw
 #### Model assumptions
 
 
-
-### Hypothesis 2a: outcome: correct name recall {.tabset}
+### Hypothesis 3b: outcome: correct name recall {.tabset}
 
 Did participants recall a higher number of correct campaigner names when they are trained to pay attention to the source?
 
@@ -1679,7 +1778,7 @@ check_model(correct_name)
 
 ```
 
-### Hypothesis 2a: outcome: perceived informedness {.tabset}
+### Hypothesis 3c: outcome: perceived informedness {.tabset}
 
 Were trained participants more likely to correctly identify that they were less informed when a digital imprint was *not* present, and more informed when a digital imprint was present, compared to the group who received no training?
 
@@ -1754,7 +1853,7 @@ plot(preds) +
 
 #### Assumptions
 
-### Hypothesis 2a: outcome: correct versus incorrect recall {.tabset}
+### Hypothesis 3d: outcome: correct versus incorrect recall {.tabset}
 
 Does percieved informedness correlate with actual informedness? How is percieved informedness impacted by the training condition?
 
@@ -1822,7 +1921,9 @@ check_model(incorrect_name)
 
 ```
 
-### Hypothesis 2b: outcome: accuracy, believablity, factualness, trustworthiness {.tabset}
+## Analysis plan: hypothesis 4
+
+### Hypothesis 4: outcome: accuracy, believablity, factualness, trustworthiness {.tabset}
 
 Did those informed about the purpose of imprints use their absense/presence to evaluate the trustworthiness and credibility of the posts? 
 
@@ -1836,7 +1937,9 @@ Did those informed about the purpose of imprints use their absense/presence to e
 
 *Currently unfinished*
 
-### Hypothesis 2c: outcome: confidence in regulation {.tabset}
+## Analysis plan: hypothesis 5
+
+### Hypothesis 5: outcome: confidence in regulation {.tabset}
 
 Does being informed explicitly about the purpose of digital imprints and their relation to regulatory compliance increase perceptions that political advertising is sufficiently regulated in the UK?
 
@@ -1895,9 +1998,9 @@ ggplot(regulation_preds, aes(x = x, y = predicted)) +
 
 ```
 
-## Analysis plan: hypothesis 3
+## Analysis plan: hypothesis 6
 
-### Hypothesis 3: outcome: rank position {.tabset}
+### Hypothesis 6: outcome: rank position {.tabset}
 
 Who did participants rank the digital imprint as most useful to out of the options?
 
@@ -1978,7 +2081,9 @@ ggplot(long_useful_measures, aes(x = ranking, y = option)) +
 
 ```
 
-### Hypothesis 3: outcome: trustworthiness {.tabset}
+## Analysis plan: hypothesis 7
+
+### Hypothesis 7a: outcome: trustworthiness {.tabset}
 
 Did perceiving digital imprints as useful to other agents, as opposed to the self, increase overall perceived trustworthiness of the campaign material?
 
@@ -1992,7 +2097,7 @@ As a predictor, the higher the number for useful_rank_1 the less useful the info
 
 ```{r}
 
-useful_trust_model <- lmer(trustworthy_value ~ useful_rank_1 + + (1|id) + (1|advert), 
+useful_trust_model <- lmer(trustworthy_value ~ useful_rank_1 + (1|id) + (1|advert), 
                            data = imprint_df)
 
 ```
@@ -2047,7 +2152,7 @@ ggplot(useful_trust_preds, aes(x = x, y = predicted)) +
 ```
 
 
-### Hypothesis 3: outcome: regulation confidence {.tabset}
+### Hypothesis 7b: outcome: regulation confidence {.tabset}
 
 Is perceiving the usefulness of digital imprints as useful to other agents, as opposed to the self, associated with higher regulation confidence?
 

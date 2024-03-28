@@ -1,0 +1,744 @@
+---
+title: "Supplementary tests"
+output: html_document:
+  toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document includes all the supplementary tests conducted to explore the main dataset.
+
+### Advert level variations in informedness
+
+#### Outcome: recall of names 
+
+Did viewing a digital imprint with a piece of campaign material increase participants memory of the campaigner name, and how was the impacted by the aesthetic specifics of the advert?
+
+To test this, each correct campaign name can be tested one by one with a logistical regression model to see if viewing the imprint boosted recall of the name. For this measure, there will therefore be 4 models and corresponding visualisations. This also uses the independent measures data frame with only one row per participant: training_df.
+
+Correct names:
+
+-   Advert 1: Common sense collective: CSC 
+-   Advert 2: Breaking barriers alliance: BBA
+-   Advert 3: Speak freely inc: SFI
+-   Advert 4: Campaign for a better Britain: CBB
+
+This analysis also will tell us something about how the imprint impacted recall for each advert differently. If imprints only increase recall on some adverts and not others, this may be related to the formatting and aesthetic features of the post itself e.g., how obvious the campaign name was, or even how memorable the name was. To find evidence that supports digital imprints consistently increase recall, regardless of the formatting of the imprint, we should expect to consistently see higher recall across four campaign group names when an imprint is present.
+
+#### Models
+
+The following models will be created using a function:
+
+csc_recall <- glm(CSC ~ Advert.1, data = training_df, family = binomial())
+
+bba_recall <- glm(BBA ~ Advert.2, data = training_df, family = binomial())
+
+sfi_recall <- glm(SFI ~ Advert.3, data = training_df, family = binomial())
+
+cbb_recall <- glm(CBB ~ Advert.4, data = training_df, family = binomial())
+
+
+```{r logistic regression function, echo=FALSE}
+
+fit_and_summarize_model <- function(outcome_var, predictor_var, data) {
+  # Fit the logistic regression model
+  formula <- as.formula(paste(outcome_var, "~", predictor_var))
+  model <- glm(formula, data = data, family = binomial())
+  
+  # Extract the model summary
+  summary_df <- summary(model)$coefficients
+  
+  # Calculate odds ratios
+  odds_ratios <- exp(summary_df[, 1])
+  
+  # Calculate 95% confidence intervals for odds ratios
+  conf_int <- exp(confint(model))
+  
+  # Create a summary table
+  model_table <- data.frame(
+    Coefficient = summary_df[, 1],
+    SE = summary_df[, 2],
+    `Odds Ratio` = odds_ratios,
+    `Lower CI` = conf_int[,1],  # 2.5 % 
+    `Upper CI` = conf_int[,2],  # 97.5%
+    `p-value` = summary_df[, 4]
+  )
+  
+  rownames(model_table) <- c("(Intercept)", predictor_var)
+  
+  return(model_table)
+}
+
+```
+
+#### Table
+
+Logs odds from the default model are converted to an odds ratio for easier interpretation. These are then presented as a table with the output of the regression. To understand the direction of the odds ratio, check the original log odds coefficient. 
+
+```{r, include=FALSE}
+
+# Define the outcome variables and their corresponding predictors
+#WILL NEED TO ADD IN CBB FOR REAL DATA SET
+outcomes_and_predictors <- list(
+  CSC = "Advert.1",
+  BBA = "Advert.2",
+  SFI = "Advert.3"
+)
+
+# Initialize an empty list to store the tables
+model_tables <- list()
+
+# Loop through each outcome-predictor pair
+for (outcome in names(outcomes_and_predictors)) {
+  predictor <- outcomes_and_predictors[[outcome]]
+  model_name <- paste(outcome, "recall", sep = "_")
+  
+  # Apply the function
+  model_tables[[model_name]] <- fit_and_summarize_model(outcome, predictor, training_df)
+}
+
+# model_tables now contains THREE tables - for real dataset, will have four
+
+list2env(model_tables, envir = .GlobalEnv)
+
+```
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Function to change the column names 
+
+column_names <- function(dataframe) {
+  dataframe <- dataframe %>%
+  rename(`Odds ratio` = `Odds.Ratio`,
+         `95% CI(lower)` = `Lower.CI`,
+         `95% CI(upper)` = `Upper.CI`,
+         `p-value` = `p.value`)
+  return(dataframe)
+}
+
+CSC_recall <- column_names(CSC_recall)
+BBA_recall <- column_names(BBA_recall)
+SFI_recall <- column_names(SFI_recall)
+#CBB_recall <- column_names(CBB_recall)
+
+# Function to change rowname
+
+row_names <- function(dataframe) {
+  rownames(dataframe)[2] <- "Imprint viewed with material"
+  
+  return(dataframe)
+}
+
+CSC_recall <- row_names(CSC_recall)
+BBA_recall <- row_names(BBA_recall)
+SFI_recall <- row_names(SFI_recall)
+#CBB_recall <- row_names(CBB_recall)
+
+kable(CSC_recall, format = "html", digits = 2, caption = "Recall of Common Sense Collective campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+kable(BBA_recall, format = "html", digits = 2, caption = "Recall of Breaking Barriers Alliance campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+kable(SFI_recall, format = "html", digits = 2, caption = "Recall of Speak Freely Inc campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#kable(CBB_recall, format = "html", digits = 2, caption = "Recall of common sense #collective campaign group by imprint viewed") %>%
+#  kable_styling(bootstrap_options = c("striped", "hover"))
+
+
+```
+
+#### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+csc_raw <- ggplot(training_df, aes(x = factor(Advert.1, labels = c("no imprint", "imprint")), fill = factor(CSC, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Common Sense Collective", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Common Sense Collective", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+bba_raw <- ggplot(training_df, aes(x = factor(Advert.2, labels = c("no imprint", "imprint")), fill = factor(BBA, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Breaking Barriers Alliance", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Breaking Barriers Alliance", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(),
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+sfi_raw <- ggplot(training_df, aes(x = factor(Advert.3, labels = c("no imprint", "imprint")), fill = factor(SFI, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Speak Freely Inc", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Speak Freely Inc", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(),
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+composite_plot <- csc_raw + bba_raw + sfi_raw + plot_layout(guides = "collect") 
+
+composite_plot
+
+```
+
+#### Model assumptions
+
+### Supplementary check: advert level variations 
+
+If hypothesis 1a is not supported and digital imprints are found to increase how informed an individual is, then advert level effects will be explored.
+
+Is there evidence to suggest that it is the aesthetic style and content of an advert itself that increases informedness about a source, and do digital imprints play a role in informing citizens above and beyond this?
+
+Claims tested:
+
+- Informedness about the source will be increased by the presence of a digital imprint, even when accounting for variations in campaign material content and format
+
+This hypothesis has already partly been tested in the name recall section under hypothesis 1a, outcome: recall of names.
+
+To further explore this, we can conduct an analysis comparing the effect of viewing each campaign post with and without the inclusion of a digital imprint on persuasion knowledge, political goal recognition, and perceived informedness.
+
+#### Persuasion knowledge
+
+```{r advert level variations in PK, echo=FALSE, fig.align='center'}
+
+# Calculate summary statistics
+summary_ad_PK <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_pk = mean(PK, na.rm = TRUE),
+            sd_pk = sd(PK, na.rm = TRUE),
+            se_pk = sd_pk / sqrt(n),
+            ci_upper = mean_pk + 1.96 * se_pk,
+            ci_lower = mean_pk - 1.96 * se_pk) %>%
+  ungroup()
+
+kable(summary_ad_PK, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved persuasion knowledge") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_PK_plot <- ggplot(data = imprint_df, aes(x = advert, y = PK, fill = version)) 
+
+ad_PK_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
+
+```
+
+#### Political goal recognition
+
+```{r advert level variations in PG, echo=FALSE, fig.align='center'}
+
+# Calculate summary statistics
+summary_ad_PG <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_pg = mean(PG_value, na.rm = TRUE),
+            sd_pg = sd(PG_value, na.rm = TRUE),
+            se_pg = sd_pg / sqrt(n),
+            ci_upper = mean_pg + 1.96 * se_pg,
+            ci_lower = mean_pg - 1.96 * se_pg) %>%
+  ungroup()
+
+kable(summary_ad_PG, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved political goal") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_PG_plot <- ggplot(data = imprint_df, aes(x = advert, y = PG_value, fill = version)) 
+
+ad_PG_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
+
+```
+
+#### Informedness
+
+```{r advert level variations in informed, echo=FALSE, fig.align='center'}
+
+# Calculate summary statistics
+summary_ad_in <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_in = mean(informed, na.rm = TRUE),
+            sd_in = sd(informed, na.rm = TRUE),
+            se_in = sd_in / sqrt(n),
+            ci_upper = mean_in + 1.96 * se_in,
+            ci_lower = mean_in - 1.96 * se_in) %>%
+  ungroup()
+
+kable(summary_ad_in, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved informedness") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_in_plot <- ggplot(data = imprint_df, aes(x = advert, y = informed, fill = version))
+
+ad_in_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
+
+```
+
+### Digital imprint inclusion and percieved trustworthiness
+
+Did the inclusion of a digital imprint influence how trustworthy and credible the posts were perceived to be?
+
+Outcome: accurate/believable/factual/trustworthy, numerical scale 1-7
+Fixed effects: Version of post viewed, binary
+Random effects: id and advert
+
+#### Models
+
+The models below are created through a function
+
+- model_accurate_value <- lmer(accurate_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_believable_value <- lmer(believable_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_factual_value <- lmer(factual_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_trustworthy_value <- lmer(trustworthy_value ~ version + (1|id) + (1|advert), data = imprint_df)
+
+```{r, include=FALSE}
+
+#function to create the models for each of the four outcomes
+
+fitMixedModel <- function(outcome, data) {
+  # Construct the formula string dynamically
+  formulaString <- paste(outcome, "~ version + (1|id) + (1|advert)", sep = " ")
+  # Convert the string to a formula
+  modelFormula <- as.formula(formulaString)
+  # Fit the model
+  model <- lmer(modelFormula, data = data)
+  # Construct a name for the model variable based on the outcome
+  modelName <- paste("model_", outcome, sep = "")
+  # Assign the model to the global environment
+  assign(modelName, model, envir = .GlobalEnv)
+}
+
+outcomes <- c("accurate_value", "believable_value", "factual_value", "trustworthy_value")
+
+lapply(outcomes, fitMixedModel, data = imprint_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+#Cannot create a function for this that doesn't output the tables as a new tab in a browser, rather than embedded in the knitted document. Also cannot centralise the tables in the knitted document. This will do for now.
+
+accuracy_tab <- tab_model(model_accurate_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved accuracy")
+
+believable_tab <- tab_model(model_believable_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved believability")
+
+factual_tab <- tab_model(model_factual_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved factualness")
+
+trustworthy_tab <- tab_model(model_trustworthy_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved trustworthiness")
+
+accuracy_tab 
+believable_tab 
+factual_tab 
+trustworthy_tab
+  
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+long_trust_measures <- pivot_longer(imprint_df, 
+                                cols = c(accurate_value, believable_value, 
+                                         factual_value, trustworthy_value), 
+                                names_to = "outcome", 
+                                values_to = "value")
+
+ggplot(long_trust_measures, aes(x = outcome, y = value, fill = version)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Outcomes by Version",
+       x = "outcome",
+       y = "Distrubution of response") +
+  theme(axis.text.x = element_text(hjust = 1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+pred_accurate <- ggpredict(model_accurate_value, terms = "version")
+pred_believable <- ggpredict(model_believable_value, terms = "version")
+pred_factual <- ggpredict(model_factual_value, terms = "version")
+pred_trustworthy <- ggpredict(model_trustworthy_value, terms = "version")
+
+ggplot(pred_accurate, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted accuracy value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived accurateness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_believable, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted believable value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived believability of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_factual, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted factual value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived factualness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_trustworthy, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted trustworthy value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived trustworthiness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+```
+
+### Training condition and number recall
+
+Do participants more correctly recall that 2 of the pieces of material included imprints when they were trained of thier purpose (and primed to notice them)?
+
+- Outcome: recall_correct
+- Predictor: Training.condition
+
+#### Model
+
+```{r, warning=FALSE}
+
+#A previously created function is used to fit the model: glm(correct_recall ~ Training.condition, data = training_df, family = binomial())
+
+num_recall_table <- fit_and_summarize_model("recall_correct", "Training.condition", training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE, fig.align='center'}
+
+kable(num_recall_table, format = "html", digits = 2, caption = "Effect of the training condition on reducing incorrect recall of the number of posts with imprints") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+```
+
+#### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+num_recall_raw <- ggplot(training_df, aes(x = factor(Training.condition, labels = c("not trained", "trained")), fill = factor(recall_correct, levels = c("incorrect", "correct"), labels = c("incorrect recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Training condition", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1")
+
+num_recall_raw
+
+```
+
+#### Model assumptions
+
+### Training condition and correct versus incorrect recall
+
+Does percieved informedness correlate with actual informedness? How is percieved informedness impacted by the training condition?
+
+This hypothesis has already partly been tested by previous models. For example, the interaction effect of training condition and version on percieved informedness. Here, if percieved informedness correlated with actual informedness, we would expect to see lower informedness for material viewed without an imprint. We would expect a bigger difference between those who had been trained, indicating a higher awareness and understanding about when they had - and had not - been informed about the source.
+
+However, we can further test whether the training condition caused participants to be more confident in how informed they were, but less accurate. This is by using the responses from the name recall measure, where participants were given a multiple choice of many names and were asked to identify the campaign names of the posts they viewed. Four were correct, and a higher number of correct name identification suggests increased informedness about the source. However, those who were trained might just feel more confident that they are informed and therefore more likely to select a number of names from the list. As four of the names were incorrect, to check for this we can test whether the training condition increased the number of incorrect names identified - this indicates increased confidence, but lower accuracy.
+
+#### Model
+
+- Outcome: name_incorrect, numerical 0-4
+- Predictor: Training.condition
+
+```{r}
+
+incorrect_name <- lm(name_incorrect ~ Training.condition, data = training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE, fig.align='center'}
+
+incorrect_name_tab <- tab_model(incorrect_name, 
+                           pred.labels = c("Intercept", "Trained"),
+                           dv.labels = "Number of names incorrectly recalled")
+
+incorrect_name_tab
+
+```
+
+#### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = factor(Training.condition), y = name_incorrect)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Training condition", y = "Incorrect name recall", title = "Distribution of incorrect name recall by training condition") +
+  theme_minimal()
+
+```
+
+#### Plotting: Model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Generate predicted values using the ggeffects package
+incorrect_name_preds <- ggpredict(incorrect_name, terms = "Training.condition")
+
+ggplot(incorrect_name_preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Training condition", y = "Predicted incorrect name recall (95% CI)", 
+       title = "Predicted effect of training condition on incorrect name recall") +
+  ylim(0, 3) +
+  theme_minimal()
+
+```
+
+### Ranking measures
+
+Who did participants rank the digital imprint as most useful to out of the options?
+
+Options:
+
+- useful_rank_1 = Voters
+- useful_rank_2 = The Electoral Commission
+- useful_rank_3 = Academic researchers
+- useful_rank_4 = Journalists
+- useful_rank_5 = The Police
+- useful_rank_6 = Other
+
+#### Plotting: frequency
+
+```{r, echo=FALSE, fig.align='center'}
+
+#create long data for each of the response options
+
+long_useful_measures <- pivot_longer(training_df, 
+                                cols = c(useful_rank_1, useful_rank_2, useful_rank_3,
+                                         useful_rank_4, useful_rank_5, useful_rank_6
+                                         ), 
+                                names_to = "ranking", 
+                                values_to = "option")
+
+#rename the categories within ranking and order
+
+long_useful_measures <- long_useful_measures %>%
+  mutate(ranking = recode(ranking, 
+         useful_rank_1 = "Voters",
+         useful_rank_2 = "The Electoral Commission",
+         useful_rank_3 = "Academic researchers",
+         useful_rank_4 = "Journalists",
+         useful_rank_5 = "The Police",
+         useful_rank_6 = "Other"),
+         ranking = factor(ranking, levels = c("Voters", 
+                                              "The Electoral Commission", 
+                                              "Academic researchers", 
+                                              "Journalists", 
+                                              "The Police", 
+                                              "Other")))
+
+#Plotting a bubble chart for frequency visualistion
+
+long_useful_freq <- long_useful_measures %>%
+  group_by(ranking, option) %>%
+  summarise(count = n(), .groups = 'drop')
+
+ggplot(long_useful_freq, aes(x = ranking, y = option, size = count)) +
+  geom_point(colour = "sienna3") + 
+  scale_fill_brewer(palette = "Spectral") + # Color palette for fill
+  scale_size_continuous(range = c(3, 12)) + # Adjust bubble sizes as needed
+  labs(title = "Rank Ordering of Options",
+       x = "Category",
+       y = "Rank",
+       size = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45)) +
+  scale_y_reverse()
+
+```
+
+#### Plotting: boxplots
+
+This will plot the distribution across each of the 6 response options.
+
+```{r, echo=FALSE, fig.align='center'}
+
+#plot the distribution
+
+ggplot(long_useful_measures, aes(x = ranking, y = option)) +
+  geom_boxplot(width = 0.3) +
+  theme_minimal() +
+  labs(title = "Distrubution of ranking",
+       x = "Category",
+       y = "Distrubution of response") +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45))
+
+```
+
+### Usefullness and perception of campaign content
+
+Did perceiving digital imprints as useful to other agents, as opposed to the self, increase overall perceived trustworthiness of the campaign material?
+
+As a predictor, the higher the number for useful_rank_1 the less useful the information made transparent was perceived to be to the self/voters.
+
+- Outcome: trustworthy, numerical 1-7
+- Fixed effect: useful_rank_1, numerical 1-6
+- Random effects: id and advert
+
+#### Model
+
+```{r}
+
+useful_trust_model <- lmer(trustworthy_value ~ useful_rank_1 + (1|id) + (1|advert), 
+                           data = imprint_df)
+
+```
+
+#### Table
+
+The rank position coefficient predicts the effect of perceiving the usefulness of the information as incrementally less relevant to the self/voter. The higher the number of the measure, the less useful this information was seen to be for the self. If the hypothesis were supported, we would expect to see a positive coeffecient.
+
+```{r, echo=FALSE}
+
+useful_trust_tab <- tab_model(useful_trust_model,
+          pred.labels = c("Intercept", "Rank position"),
+          dv.labels = "Percieved trustworthiness of campaign material")
+
+useful_trust_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(data=imprint_df, aes(x=useful_rank_1, y=trustworthy_value)) +
+  geom_point() +
+  geom_jitter() +
+  geom_smooth(method = lm, se=FALSE) +
+  theme_minimal() +
+  labs(
+    title = "Association between rank position and perceived trustworthiness of the \n campaign material",
+    x = "Rank position of 'voter' (1 = most useful to)",
+    y = "Percieved trustworthiness"
+  ) +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+useful_trust_preds <- ggpredict(useful_trust_model, terms="useful_rank_1")
+
+ggplot(useful_trust_preds, aes(x = x, y = predicted)) +
+  geom_line(aes(y = predicted), color = "blue") +
+  geom_ribbon(aes(ymin = predicted - std.error, ymax = predicted + std.error), fill = "lightgrey", alpha = 0.2) +
+  ylim(1, 7) +
+  scale_x_continuous(breaks = seq(1, 6, by=1)) +
+  theme_minimal() +
+  labs(x = "Rank position of voter (1 = most useful to)", y = "Predicted trustworthiness", 
+       title = "Predicted effect of voter rank position on perceived trustworthiness of \n campaign material") 
+
+```
+
+
+### Usefullness and confidence in regulation
+
+Is perceiving the usefulness of digital imprints as useful to other agents, as opposed to the self, associated with higher regulation confidence?
+
+- Outcome: regulation confidence, numerical 1-7
+- Predictor: useful_rank_1, numerical 1-6
+
+#### Model
+
+```{r}
+
+useful_reg_model <- lm(election_reg ~ useful_rank_1, data = training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+useful_reg_tab <- tab_model(useful_reg_model, 
+                           pred.labels = c("Intercept", "Rank of 'voter'"),
+                           dv.labels = "Perceived sufficiency of advertising 
+                           regulation")
+
+useful_reg_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = useful_rank_1, y = election_reg)) +
+  geom_point() +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_smooth(method=lm, se = FALSE) +
+  labs(x = "Rank position of 'voter' (1 = most useful to)", 
+       y = "Regulation confidence", 
+       title = "Association between rank position of voter and regulation confidence") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(1, 6, by=1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+useful_reg_preds <- ggpredict(useful_reg_model, terms="useful_rank_1")
+
+ggplot(useful_reg_preds, aes(x = x, y = predicted)) +
+  geom_line(aes(y = predicted), color = "blue") +
+  geom_ribbon(aes(ymin = predicted - std.error, ymax = predicted + std.error), fill = "lightgrey", alpha = 0.2) +
+  ylim(1, 7) +
+  scale_x_continuous(breaks = seq(1, 6, by=1)) +
+  theme_minimal() +
+  labs(x = "Rank position of voter (1 = most useful to)", y = "Predicted regulation confidence", 
+       title = "Predicted effect of voter rank position on regulation confidence") 
+
+```

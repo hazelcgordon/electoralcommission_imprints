@@ -1,0 +1,128 @@
+---
+title: "Checking data quality and exclusions"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document describes the process that was taken by the researchers to ensure data quality. It begins with the raw dataset, and shows how missing data and exclusions were identified and handled.
+
+The document is not designed to be run/knitted all together, but rather to be checked at each stage.
+
+```{r reading in data}
+
+library(dplyr)
+
+data <- read.csv("checks.csv")
+
+```
+
+### Blank rows
+
+The original dataset included ... observations.
+
+On qualtrics, all responses bar campaigner name recall were forced response. This means, any row with blank data for variables other than the repeated measure variables  - of which participants only answered half due to the experimental manipulation - indicates missing data of which the whole row will need to be removed as it suggests this participant did not complete the study.
+
+These are identified by selecting the attention check variable answered by all participants: EPE_5 to check for blank responses. The choice of the attention check variable is arbitrary, and could be any variable answered by all participants.
+
+```{r blank column values}
+
+table(data$EPE_5)
+
+rows_with_blank_in_name <- grepl("^\\s*$", data$EPE_5)
+df_with_blanks_in_name <- data[rows_with_blank_in_name, ]
+
+print(df_with_blanks_in_name)
+
+#as can be seen, the participants either did not consent or did not spend longer than a few minutes on the survey. These rows are first excluded, leaving ... observations.
+
+data_1 <- data[!rows_with_blank_in_name, ]
+
+#checking this returns only rows with responses for attention check 2
+
+table(data_1$EPE_5)
+
+```
+
+### Attention checks
+
+Attention check columns are: 
+
+- informed_2_5: participants asked to click response option 'strongly disagree'
+- informed_2imprint_5: participants asked to click response option 'strongly disagree'
+- EPE_5: strongly agree: participants asked to click response option 'strongly agree'
+
+Participants only viewed 1 of informed_2_5 or informed_2imprint_5, and they constitute the same variable across conditions.
+
+Functions are created below to identify participants who did not answer the attention checks correctly. They must fail both to be excluded from the study.
+
+```{r attention checks}
+
+informed_pids <- function(dataframe, var) {
+  # Filter rows where variable is not 'strongly disagree' and not a blank cell
+  filtered_df <- dataframe %>% 
+    filter(.data[[var]] != "Strongly disagree" & nzchar(.data[[var]]))
+  
+  # Return the PROLIFIC_PID column from the filtered dataframe
+  return(filtered_df$PROLIFIC_PID)
+}
+
+#below creates two vectors containing the row numbers of those who answered with anything other than 'strongly disagree' for attention check 1.
+
+failed_inform <- informed_pids(data_1, "informed_2_5")
+failed_inform_imprint <- informed_pids(data_1, "informed_2imprint_5")
+
+epe_pids <- function(dataframe, var) {
+  # Filter rows where variable is not 'strongly disagree' and not a blank cell
+  filtered_df <- dataframe %>% 
+    filter(.data[[var]] != "Strongly agree" & nzchar(.data[[var]]))
+  
+  # Return the PROLIFIC_PID column from the filtered dataframe
+  return(filtered_df$PROLIFIC_PID)
+}
+
+failed_epe <- epe_pids(data, "EPE_5")
+
+#the vectors are merged into one to detect which row numbers had a frequency of 2
+
+attention_check <- c(failed_inform, failed_inform_imprint, failed_epe)
+
+#Any participant who appears twice in the vectors has failed both attention checks
+
+frequency_table <- table(attention_check)
+
+filtered_values <- frequency_table[frequency_table == 2]
+
+#below then prints which row numbers failed both, and need to be excluded
+
+print(filtered_values)
+
+#removing these row numbers from the dataset
+
+
+
+```
+
+### Median time
+
+The second exclusion rule was participants who anwered in less than half the median time of 12 minutes, as this was not considered sufficient time to engage fully with the survey.
+
+Half of 12 minutes is 360 seconds.
+
+```{r median time}
+
+below_360 <- data_1$Duration..in.seconds.[data_1$Duration..in.seconds. < 360]
+
+length(below_360)
+
+
+#filtering out these rows
+
+data_2 <- data_1 %>%
+  filter(Duration..in.seconds. >= 360)
+
+```
+
+

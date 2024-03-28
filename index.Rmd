@@ -21,8 +21,8 @@ body {
   font-family: 'Arial', sans-serif;
   line-height: 1.6;
   margin: 0 auto;
-  max-width: 800px;
-  padding: 20px;
+  max-width: 950px;
+  padding: 10px;
 }
 </style>
 
@@ -879,6 +879,8 @@ library(patchwork)
 library(knitr)
 library(kableExtra)
 library(broom)
+library(htmltools)
+library(rlang)
 
 ```
 
@@ -1038,7 +1040,142 @@ ggplot(preds, aes(x = x, y = predicted)) +
 
 ### Hypothesis 1b, outcome: recall of names
 
-*Need to develop this code to merge all adverts into one variable.*
+Did viewing a digital imprint with a piece of campaign material increase participants memory of the campaigner name?
+
+To test this, recall of the campaigner name can be tested with a logistical regression model to see if viewing the imprint boosted recall of the name. This also uses a newly created dataframe: recall_transform.
+
+Correct names:
+
+-   Advert 1: Common sense collective: CSC 
+-   Advert 2: Breaking barriers alliance: BBA
+-   Advert 3: Speak freely inc: SFI
+-   Advert 4: Campaign for a better Britain: CBB
+
+#### Model
+
+- Outcome: recall, binary factor
+- Predictor: version, binary factor
+
+```{r, echo=FALSE}
+
+#the following code creates a new dataframe that matches the campaigner name - currently a binary variable in imprint_df specifying if the name was recalled - with the corresponding advert. This creates a new variable 'recall' so all responses can be analysed together.
+
+recall_df <- imprint_df %>%
+  select(id, advert, version, CSC, BBA, SFI, CBB) %>%
+  mutate(
+    CSC = as.integer(CSC),
+    BBA = as.integer(BBA),
+    SFI = as.integer(SFI),
+    CBB = as.integer(CBB),
+    recall = case_when(
+    advert == "advert.1" ~ CSC,
+    advert == "advert.2" ~ BBA,
+    advert == "advert.3" ~ SFI,
+    advert == "advert.4" ~ CBB,
+    TRUE ~ NA_integer_ # Fallback in case of unexpected 'advert' values
+  ))
+
+recall_df <- recall_df %>%
+  select(id, advert, version, recall, everything())
+
+recall_df <- recall_df %>%
+  mutate(recall = factor(recall - 1, levels = 0:1))
+
+```
+
+```{r}
+
+name_recall <- glm(recall ~ version, data = recall_df, family = binomial())
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+summarise_model <- function(model) {
+  
+  # Extract the model summary
+  summary_df <- summary(model)$coefficients
+  
+  # Calculate odds ratios
+  odds_ratios <- exp(summary_df[, 1])
+  
+  # Calculate 95% confidence intervals for odds ratios
+  conf_int <- exp(confint(model))
+  
+  # Create a summary table
+  model_table <- data.frame(
+    Coefficient = summary_df[, 1],
+    SE = summary_df[, 2],
+    `Odds Ratio` = odds_ratios,
+    `Lower CI` = conf_int[,1],  # 2.5 % 
+    `Upper CI` = conf_int[,2],  # 97.5%
+    `p-value` = summary_df[, 4]
+  )
+  
+  return(model_table)
+}
+
+recall_table <- summarise_model(name_recall)
+
+column_names <- function(dataframe) {
+  dataframe <- dataframe %>%
+  rename(`Odds ratio` = `Odds.Ratio`,
+         `95% CI(lower)` = `Lower.CI`,
+         `95% CI(upper)` = `Upper.CI`,
+         `p-value` = `p.value`)
+  return(dataframe)
+}
+
+recall_table <- column_names(recall_table)
+
+row_names <- function(dataframe) {
+  rownames(dataframe)[2] <- "Imprint viewed with material"
+  
+  return(dataframe)
+}
+
+recall_table <- row_names(recall_table)
+
+kable(recall_table, format = "html", digits = 2, caption = "Recall of campaigner name") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(recall_df, aes(x = factor(version, labels = c("no imprint", "imprint")), fill = factor(recall, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Version viewed", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Version viewed", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+preds_recall <- ggpredict(name_recall, terms = "version [all]")
+
+ggplot(preds_recall, aes(x = x, y = predicted, group = 1)) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1, color = "sienna") +
+  geom_point(color = "sienna") +
+  ylim(0, 1) +
+  labs(title = "Predicted Probability of campaigner name recall by version of material viewed",
+       x = "Imprint viewed", y = "Probability of recall") +
+  theme_minimal()
+
+```
+
 
 ### Hypotheses 1c: outcome: perceived informedness
 
@@ -1239,9 +1376,7 @@ plot(preds) +
 
 ### Hypothesis 3: outcome: trustworthiness
 
-Did those informed about the purpose of imprints use their absense/presence to evaluate the trustworthiness and credibility of the posts? 
-
-*These measures will all be analysed in the same way as hypothesis 2a: outcome: perceived informedness, with an interaction effect between the training condition and the version of the advert viewed.*
+Did those informed about the purpose of imprints use their absence/presence to evaluate the trustworthiness and credibility of the posts? 
 
 - Outcome: accurate/factual/believable/trustworthy, numerical 1-7
 - fixed effect: training condition x version of imprint viewed (interaction effect)
@@ -1249,7 +1384,115 @@ Did those informed about the purpose of imprints use their absense/presence to e
 
 #### Models
 
-*Currently unfinished*
+Four models are created through the use of a function for each of the outcome variables, using the following forumula:
+
+model <- lmer(outcome ~ Training.condition + version + Training.condition*version + (1|id) + (1|advert))
+
+```{r, echo=FALSE}
+
+#below is a function specifying the same model for each of the outcome variables
+
+fit_trust_model <- function(data, outcomes) {
+  models <- list()
+  
+  for (outcome in outcomes) {
+    formula <- as.formula(paste(outcome, "~ Training.condition + version + Training.condition*version + (1|id) + (1|advert)", sep = ""))
+    model <- lmer(formula, data = data)
+    models[[outcome]] <- model
+  }
+  
+  return(models)
+}
+
+outcomes <- c("trustworthy_value", "believable_value", "accurate_value", "factual_value")
+models <- fit_trust_model(imprint_df, outcomes)
+
+for (outcome in names(models)) {
+  assign(paste("model", outcome, sep = "_"), models[[outcome]], envir = .GlobalEnv)
+}
+
+```
+
+#### Tables
+
+```{r, echo=FALSE}
+
+tab_model(model_trustworthy_value, file = "tables/trustworthy.html",  
+pred.labels = c("Intercept", "Training", "Digital Imprint included", "Training*imprint"), dv.labels = "Perceived trustworthiness")
+
+tab_model(model_believable_value, file = "tables/believe.html",  
+pred.labels = c("Intercept", "Training", "Digital Imprint included", "Training*imprint"), dv.labels = "Perceived believability")
+
+tab_model(model_accurate_value, file = "tables/accurate.html",  
+pred.labels = c("Intercept", "Training", "Digital Imprint included", "Training*imprint"), dv.labels = "Perceived accuracy")
+
+tab_model(model_factual_value, file = "tables/factual.html",  
+pred.labels = c("Intercept", "Training", "Digital Imprint included", "Training*imprint"), dv.labels = "Perceived fact versus opinion")
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+#the function below creates the same graph with a loop
+
+plot_outcomes <- function(data, outcomes) {
+  for (outcome in outcomes) {
+    # Create the plot with dynamic y aesthetic using tidy evaluation
+    p <- ggplot(data, aes(x = Training.condition, y = !!sym(outcome), fill = version)) +
+      geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+      geom_boxplot(width = 0.2) +
+      theme_minimal() +
+      labs(y = outcome) # Dynamically label the Y-axis based on the outcome variable
+    
+    # Print the plot
+    print(p)
+  }
+}
+
+plot_outcomes(imprint_df, outcomes)
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+preds_trust <- ggpredict(model_trustworthy_value, terms = c("Training.condition", "version"))
+preds_believe <- ggpredict(model_believable_value, terms = c("Training.condition", "version"))
+preds_accurate <- ggpredict(model_accurate_value, terms = c("Training.condition", "version"))
+preds_fact <- ggpredict(model_factual_value, terms = c("Training.condition", "version"))
+
+plot(preds_trust) +
+  ylim(1, 7) +
+  labs(title = "Interaction Effect",
+       x = "Training condition",
+       y = "Predicted trustworthiness",
+       color = "Digital imprint \n included")
+
+plot(preds_believe) +
+  ylim(1, 7) +
+  labs(title = "Interaction Effect",
+       x = "Training condition",
+       y = "Predicted believability",
+       color = "Digital imprint \n included")
+
+plot(preds_accurate) +
+  ylim(1, 7) +
+  labs(title = "Interaction Effect",
+       x = "Training condition",
+       y = "Predicted accuracy",
+       color = "Digital imprint \n included")
+
+plot(preds_fact) +
+  ylim(1, 7) +
+  labs(title = "Interaction Effect",
+       x = "Training condition",
+       y = "Predicted factualnes",
+       color = "Digital imprint \n included")
+
+```
 
 ### Hypothesis 4: outcome: confidence in regulation 
 

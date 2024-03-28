@@ -9,6 +9,7 @@ author:
 output: 
   html_document:
     toc: true
+    css: styles.css
 ---
 
 ```{r setup, include=FALSE}

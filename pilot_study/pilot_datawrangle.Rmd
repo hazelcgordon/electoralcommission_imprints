@@ -1,0 +1,786 @@
+---
+title: "Electoral Commission imprints project data wrangling code (pilot)"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries needed}
+
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+
+```
+
+## Preparing the dataset {.tabset}
+
+### Reading and exclusions
+
+```{r read df}
+
+pilotdata <- read.csv("pilot_data.csv")
+
+#EXCLUSION FOR PILOT DATA ONLY (MISSING VALUE, now forced response added on qualtrics)
+
+n <- 34
+pilotdata <- pilotdata[-n, ]
+
+#extract relevant variables into new data frame
+
+data <- pilotdata %>%
+  select(Training.condition, Advert.1, Advert.2, Advert.3, Advert.4, starts_with("PK"), starts_with("agree"), starts_with("informed"), starts_with("accurate"), starts_with("believable"), starts_with("trustworthy"), starts_with("factual"), election_reg, recall_num, recall_name, starts_with("useful"), reg_know, starts_with("EPE"), starts_with("general_confidence"), starts_with("institution"), democracy, political_interest, external_efficacy, internal_efficacy, starts_with("SM"), partyID, age, gender, education)
+
+#removing top 2 rows
+
+data <- data %>%
+  slice(-c(1, 2))
+
+#give each participant a number identifier
+
+data <- data %>% 
+  mutate(id = row_number())
+
+#moving id identifier to the front
+
+data <- data %>%
+  select(id, everything())
+
+```
+
+### Agree/disagree item transformations and reverse code
+
+The code below will convert all variables with response measurement of strongly disagree to strongly agree from a character variable to a numerical scale of 1-7. One item also needs to be reverse scored:
+
+- Informed item 3: 'I am not sure who is behind this material'
+
+There are also attention checks in the dataset that need to be removed **once exclusions have been dealt with**:
+
+- informed_2_5
+- informed_2imprint_5
+- EPE_5
+
+Below creates a functions that will be applied to all agree-disagree response formats in the dataset - all ones that start with PK, agree, informed, EPE and general_confidence. The second function then reverse scores informed item three across the eight advert variations.
+
+**different scale options for agree, epe and general_confidence**
+
+```{r convert to numeric}
+
+#converting to numeric variables from character for agree - disagree
+
+#THIS CURRENTLY WON'T WORK FOR AGREE, EPE, INFORMED and GENERAL: CHANGE RESPONSE OPTIONS ON QUALTRICS
+
+# Define the function to convert responses to numeric
+convert_responses_to_numeric <- function(response) {
+  # Define the mapping from response to numeric value
+  mapping <- c(
+    "Strongly disagree" = 1,
+    "Somewhat disagree" = 2,
+    "Slightly disagree" = 3,
+    "Neither agree nor disagree" = 4,
+    "Slightly agree" = 5,
+    "Somewhat agree" = 6,
+    "Strongly agree" = 7
+  )
+  
+  # Replace the character response with its corresponding numeric value
+  return(mapping[response])
+}
+
+convert_2 <- function(response) {
+
+  mapping <- c(
+    "Strongly disagree" = 1,
+    "Disagree" = 2,
+    "Somewhat disagree" = 3,
+    "Neither agree nor disagree" = 4,
+    "Somewhat agree" = 5,
+    "Agree" = 6,
+    "Strongly agree" = 7
+  )
+  
+  return(mapping[response])
+}
+
+#applying this function to the data frame (two separate functions to account for differences in response options)
+
+data <- data %>%
+  mutate(across(c(starts_with("PK")), ~convert_responses_to_numeric(.x)))
+         
+data <- data %>%
+  mutate(across(c(starts_with("informed"), starts_with("agree"), starts_with("EPE"), starts_with("general")), ~convert_2(.x)))
+
+#reverse scoring informed item 3
+
+reverse_code <- function(response) {
+  # Define the mapping from original to reversed scores
+  mapping <- c(1, 2, 3, 4, 5, 6, 7)
+  names(mapping) <- c(7, 6, 5, 4, 3, 2, 1)
+  
+  # Use the response as a name to look up in the mapping
+  return(as.numeric(names(mapping)[match(response, mapping)]))
+}
+
+data <- data %>%
+  mutate(across(c(informed_1_3, informed_1imprint_3, informed_2_3, informed_2imprint_3, informed_3_3, informed_3imprint_3, informed_4_3, informed_4imprint_3), ~reverse_code(.x)))
+
+#removing the attention check columns from the dataset
+
+data <- data %>%
+  select(-informed_2_5, -informed_2imprint_5, -EPE_5)
+
+```
+
+### Variable tranformations for both dataframes
+
+The code below conducts the following transformations to the variables that will be present in both the repeated measures and independent measures data frames so they are ready to be analysed:
+
+-   **Transformed to a factor**: advert.1, advert.2, advert.3, advert.4, Training.condition, reg_know, SM_use, starts with: SM_frequency, party_ID, gender, education
+
+-   **Transformed to a numerical variable**: election_reg, starts with: useful_rank, starts with: institution_trust, democracy, political_interest, external_efficacy, internal_efficacy, age
+
+*Some variables will only be present in the repeated measures data frame and will be created later.*
+
+```{r convert to factor function}
+
+#creating factor variables through use of a function
+
+convert_to_factor <- function(df, cols) {
+  df %>%
+    mutate(across(all_of(cols), as.factor))
+}
+
+data <- data %>%
+  convert_to_factor(c("Advert.1", "Advert.2", "Advert.3", "Advert.4", "SM_frequency_1", "SM_frequency_2", "SM_frequency_3", "SM_frequency_4", "SM_frequency_5", "SM_frequency_6", "Training.condition", "reg_know", "SM_use", "partyID", "gender", "education"))
+
+#Setting reference groups for: reg_know, SM_use, SM_frequency, gender, education
+
+#regulation knowledge
+
+reg_response_order <- c("There are no regulatory controls on any type of political advertising during UK elections", "All political advertising is regulated by rules set by the UK government, but there is one set of rules for advertising on television and radio and a different set of rules for advertising on the internet and social media", "All political advertising (whether on television, radio, in newspapers or the internet) is subject to the same rules set by the UK government", "Not sure")
+
+data <- data %>%
+  mutate(across(reg_know, ~factor(.x, levels = reg_response_order)))
+
+#Social media use
+  
+use_response_order <- c("None, No time at all ", "Less than 1/2 hour ", "1/2 hour to 1 hour ", "1 to 2 hours ",  "Not sure")
+
+data <- data %>%
+  mutate(across(SM_use, ~factor(.x, levels = use_response_order)))
+  
+#SM frequency use
+  
+freq_response_order <- c("Never",
+                         "Less than once a week",
+                         "Once a week\t",
+                         "Once every couple of days\t",
+                         "Once a day\t",
+                         "2-5 times a day\t",
+                         "More than five times a day\t")
+
+data <- data %>%
+  mutate(across(starts_with("SM_frequency"), ~factor(.x, levels = freq_response_order)))
+
+#gender OTHER WILL BE REMOVED FOR MAIN STUDY
+
+gender_response_order <- c("Female", "Male", "Non-binary / third gender", "Other, please specify")
+
+data <- data %>%
+  mutate(across(gender, ~factor(.x, levels = gender_response_order)))
+
+#Education level NOT ALL LEVELS USED IN PILOT, NEEDS UPDATING WHEN MAIN
+
+ed_response_order <- c("GCSE level, or equivalent", "A-level, or equivalent", "Undergraduate University (e.g. BA, B.Sc, B.Ed)", "Postgraduate (e.g. M.Sc, Ph.D)")
+
+data <- data %>%
+  mutate(across(education, ~factor(.x, levels = ed_response_order)))
+
+
+```
+
+```{r convert to numeric function}
+
+#Need to first change response options from categories to numbers for: election_reg, institution_trust, democracy, political_interest, internal_efficacy, external_efficacy, age
+
+#Confidence in electoral regulation
+
+data <- data %>%
+  mutate(election_reg = case_when(
+    election_reg == "Completely insufficient" ~ 1,
+    election_reg == "Mostly insufficient" ~ 2,
+    election_reg == "Slightly insufficient" ~ 3,
+    election_reg == "No opinion/not sure" ~ 4,
+    election_reg == "Slightly sufficient" ~ 5,
+    election_reg == "Mostly sufficient" ~ 6,
+    election_reg == "Completely sufficient" ~ 7
+  ))
+
+#CHANGES TO INSTITUTION TRUST WILL NOT BE NEEDED FOR FINAL DS
+
+#changing '0 - none at all' to 0 for institution_trust
+
+data <- data %>%
+  mutate(across(starts_with("institution_trust"), ~ case_when(
+    .x == "0 - none at all" ~ 0,
+    TRUE ~ as.numeric(.x)
+  )))
+
+#Converting 'democracy' to a numeric variable
+
+data <- data %>%
+  mutate(democracy = case_when(
+    democracy == "Very dissatisfied" ~ 1,
+    democracy == "A little dissatisfied" ~ 2,
+    democracy == "Fairly satisfied" ~ 3,
+    democracy == "Very satisfied" ~ 4
+  ))
+
+#converting political interest to a numerical variable
+
+data <- data %>%
+  mutate(political_interest = case_when(
+    political_interest == "Not at all interested" ~ 1,
+    political_interest == "Not very interested" ~ 2,
+    political_interest == "Slightly interested" ~ 3,
+    political_interest == "Fairly interested" ~ 4,
+    political_interest == "Very interested " ~ 5
+  ))
+
+#converting internal and external efficacy to numeric, 5 options
+
+data <- data %>%
+  mutate(internal_efficacy = case_when(
+    internal_efficacy == "Not at all " ~ 1,
+    internal_efficacy == "A little " ~ 2,
+    internal_efficacy == "A moderate amount  " ~ 3,
+    internal_efficacy == "A lot " ~ 4,
+    internal_efficacy == "A great deal " ~ 5
+  ))
+
+data <- data %>%
+  mutate(external_efficacy = case_when(
+    external_efficacy == "Not at all " ~ 1,
+    external_efficacy == "A little " ~ 2,
+    external_efficacy == "A moderate amount  " ~ 3,
+    external_efficacy == "A lot " ~ 4,
+    external_efficacy == "A great deal " ~ 5
+  ))
+
+#transforming age from a date to an age
+
+current_year <- format(Sys.Date(), "%Y")
+
+current_year <- as.numeric(current_year)
+data$age <- as.numeric(data$age)
+
+data$age <- current_year - data$age
+
+#creating numeric variables through the use of a function
+
+convert_to_numeric <- function(df, cols) {
+  df %>%
+    mutate(across(all_of(cols), as.numeric))
+}
+
+#Convert all other variables to numeric
+
+data <- data %>%
+  convert_to_numeric(c("useful_rank_1", "useful_rank_2", "useful_rank_3", "useful_rank_4", "useful_rank_5", "useful_rank_6"))
+
+```
+
+Transformation of recall variables:
+-   **Recall_num**: two new columns need to be created specifying those who picked 'not sure' versus those who chose an answer, then those who were correct, chose 2, and those who were incorrect. 
+-   **Recall_name**: 8 potential columns will need to be created with a binary response, indicating whether each name option was identified e.g. 'common sense collective'. 
+
+- The correct identification options are:
+  - Common sense collective - advert 1
+  - Breaking barriers alliance - advert 2
+  - Speak freely Inc.- advert 3
+  - Campaign for a better Britain - advert 4
+  
+- Incorrect options
+  - Future first
+  - The peoples movement
+  - Voice for the people
+  - Hope something - removed from qualtrics and replaced with ad 4
+  - All together
+  
+A NAME IS MISSING FROM THE LIST IN QUALTRICS, CBB, NOW ADDED
+
+
+```{r recall name and num tranformations}
+
+#Recall number transformation
+
+#column one estimating perceived informedness, recall_answer
+
+data <- data %>%
+  mutate(recall_answer = 
+           case_when(
+             recall_num == "Not sure" ~ 0,
+             TRUE ~ 1
+           ))
+
+#column two showing actual informedness, recall_correct
+
+data <- data %>%
+  mutate(recall_correct = 
+           case_when(
+             recall_num == 2 ~ "correct",
+             TRUE ~ "incorrect"
+           ))
+
+#Recall name transformation, correct responses
+
+data <- data %>%
+  mutate(CSC = case_when(
+    str_detect(recall_name, "Common Sense Collective") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(BBA = case_when(
+    str_detect(recall_name, "Breaking Barriers Alliance") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(SFI = case_when(
+    str_detect(recall_name, "Speak Freely Inc") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(CBB = case_when(
+    str_detect(recall_name, "Campaign for a better Britain") ~ 1,
+    TRUE ~ 0
+  ))
+
+#incorrect responses
+
+data <- data %>%
+  mutate(FF = case_when(
+    str_detect(recall_name, "Future First") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(TPM = case_when(
+    str_detect(recall_name, "The People’s movement") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(VFP = case_when(
+    str_detect(recall_name, "Voice for the People") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(AT = case_when(
+    str_detect(recall_name, "All Together") ~ 1,
+    TRUE ~ 0
+  ))
+
+#number of correct names recalled, name_correct
+
+data <- data %>%
+  mutate(name_correct = CSC + BBA + SFI + CBB)
+
+#number of incorrect names recalled, name_incorrect
+
+#add incorrect columns together
+
+data <- data %>%
+  mutate(name_incorrect = FF + TPM + VFP + AT)
+
+#convert campaign names to factors
+
+data <- data %>%
+  convert_to_factor(c("recall_answer", "recall_correct", "CSC", "BBA", "SFI", "CBB", "FF", "TPM", "VFP", "AT"))
+
+```
+
+##Post-advert/repeated measures dataframe
+
+The code below turns the wide data into long data, creating 4 rows for each participant and only one column for each of the outcome variables: persuasion knowledge, political goal, informedness, agreement, believability, trustworthiness, accurateness, factual. Extra columns also specify the advert viewed and the version (imprint or no imprint).
+
+```{r convert wide to long data for repeated measures df}
+
+#create a new dataframe with only the repeated measures (post-advert) variables
+
+RM <- data %>%
+  select(id, starts_with("Advert."), starts_with("PK"), starts_with("agree"), starts_with("informed"), starts_with("accurate"), starts_with("believable"), starts_with("trustworthy"), starts_with("factual"))
+
+#when first converted into long data, eight rows are generated for each participant for the eight different advert variations, but many columns contain NA.
+
+#persuasion knowledge df, each item separate
+
+PK1_long <- RM %>%
+  select(id, starts_with("Advert."), PK_1_1, PK_1imprint_1, PK_2_1, PK_2imprint_1, PK_3_1, PK_3imprint_1, PK_4_1, PK_4imprint_1) %>%
+  pivot_longer(
+    cols = c(PK_1_1, PK_1imprint_1, PK_2_1, PK_2imprint_1, PK_3_1, PK_3imprint_1, PK_4_1, PK_4imprint_1),
+    names_to = "PK1",
+    values_to = "PK1_value"
+  )
+
+PK2_long <- RM %>%
+  select(id, starts_with("Advert."), PK_1_2, PK_1imprint_2, PK_2_2, PK_2imprint_2, PK_3_2, PK_3imprint_2, PK_4_2, PK_4imprint_2) %>%
+  pivot_longer(
+    cols = c(PK_1_2, PK_1imprint_2, PK_2_2, PK_2imprint_2, PK_3_2, PK_3imprint_2, PK_4_2, PK_4imprint_2),
+    names_to = "PK2",
+    values_to = "PK2_value"
+  )
+
+PK3_long <- RM %>%
+  select(id, starts_with("Advert."), PK_1_3, PK_1imprint_3, PK_2_3, PK_2imprint_3, PK_3_3, PK_3imprint_3, PK_4_3, PK_4imprint_3) %>%
+  pivot_longer(
+    cols = c(PK_1_3, PK_1imprint_3, PK_2_3, PK_2imprint_3, PK_3_3, PK_3imprint_3, PK_4_3, PK_4imprint_3),
+    names_to = "PK3",
+    values_to = "PK3_value"
+  )
+
+PK4_long <- RM %>%
+  select(id, starts_with("Advert."), PK_1_4, PK_1imprint_4, PK_2_4, PK_2imprint_4, PK_3_4, PK_3imprint_4, PK_4_4, PK_4imprint_4) %>%
+  pivot_longer(
+    cols = c(PK_1_4, PK_1imprint_4, PK_2_4, PK_2imprint_4, PK_3_4, PK_3imprint_4, PK_4_4, PK_4imprint_4),
+    names_to = "PK4",
+    values_to = "PK4_value"
+  )
+
+
+#political goal df, informed item 1
+
+PG_long <- RM %>%
+  select(id, starts_with("Advert."), informed_1_1, informed_1imprint_1, informed_2_1, informed_2imprint_1, informed_3_1, informed_3imprint_1, informed_4_1, informed_4imprint_1) %>%
+  pivot_longer(
+    cols = c(informed_1_1, informed_1imprint_1, informed_2_1, informed_2imprint_1, informed_3_1, informed_3imprint_1, informed_4_1, informed_4imprint_1),
+    names_to = "political_goal",
+    values_to = "PG_value"
+  )
+
+#informed df, each item separate
+
+informed2_long <- RM %>%
+  select(id, starts_with("Advert."), informed_1_2, informed_1imprint_2, informed_2_2, informed_2imprint_2, informed_3_2, informed_3imprint_2, informed_4_2, informed_4imprint_2) %>%
+  pivot_longer(
+    cols = c(informed_1_2, informed_1imprint_2, informed_2_2, informed_2imprint_2, informed_3_2, informed_3imprint_2, informed_4_2, informed_4imprint_2),
+    names_to = "informed2",
+    values_to = "informed2_value"
+  )
+
+informed3_long <- RM %>%
+  select(id, starts_with("Advert."), informed_1_3, informed_1imprint_3, informed_2_3, informed_2imprint_3, informed_3_3, informed_3imprint_3, informed_4_3, informed_4imprint_3) %>%
+  pivot_longer(
+    cols = c(informed_1_3, informed_1imprint_3, informed_2_3, informed_2imprint_3, informed_3_3, informed_3imprint_3, informed_4_3, informed_4imprint_3),
+    names_to = "informed3",
+    values_to = "informed3_value"
+  )
+
+informed4_long <- RM %>%
+  select(id, starts_with("Advert."), informed_1_4, informed_1imprint_4, informed_2_4, informed_2imprint_4, informed_3_4, informed_3imprint_4, informed_4_4, informed_4imprint_4) %>%
+  pivot_longer(
+    cols = c(informed_1_4, informed_1imprint_4, informed_2_4, informed_2imprint_4, informed_3_4, informed_3imprint_4, informed_4_4, informed_4imprint_4),
+    names_to = "informed4",
+    values_to = "informed4_value"
+  )
+
+#agreement df
+
+agree_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("agree")) %>%
+  pivot_longer(
+    cols = starts_with("agree"),
+    names_to = "agree",
+    values_to = "agree_value"
+  )
+
+#trustworthy df
+
+trustworthy_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("trustworthy")) %>%
+  pivot_longer(
+    cols = starts_with("trustworthy"),
+    names_to = "trustworthy",
+    values_to = "trustworthy_value"
+  )
+
+#believability df
+
+believe_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("believable")) %>%
+  pivot_longer(
+    cols = starts_with("believable"),
+    names_to = "believable",
+    values_to = "believable_value"
+  )
+
+#accurateness df
+
+accurate_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("accurate")) %>%
+  pivot_longer(
+    cols = starts_with("accurate"),
+    names_to = "accurate",
+    values_to = "accurate_value"
+  )
+
+#factual df
+
+factual_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("factual")) %>%
+  pivot_longer(
+    cols = starts_with("factual"),
+    names_to = "factual",
+    values_to = "factual_value"
+  )
+
+#Create two new variables in each indicating advert type and version viewed, so that the dataframes can be merged by these two columns
+
+#Below is three functions that can be applied to each df to create new variables.
+
+# Function to add 'advert' and 'version' based on patterns in a specified column
+add_advert_version <- function(data, column_name) {
+  data %>%
+    mutate(
+      advert = case_when(
+        str_detect(!!sym(column_name), "1") ~ "advert.1",
+        str_detect(!!sym(column_name), "2") ~ "advert.2",
+        str_detect(!!sym(column_name), "3") ~ "advert.3",
+        str_detect(!!sym(column_name), "4") ~ "advert.4",
+        TRUE ~ NA_character_
+      ),
+      version = case_when(
+        str_detect(!!sym(column_name), "imprint") ~ 1,
+        TRUE ~ 0
+      )
+    ) 
+}
+
+#apply function for agree, trust, believe, factual, accurate
+
+agree_long <- add_advert_version(agree_long, "agree")
+trustworthy_long <- add_advert_version(trustworthy_long, "trustworthy")
+believe_long <- add_advert_version(believe_long, "believable")
+accurate_long <- add_advert_version(accurate_long, "accurate")
+factual_long <- add_advert_version(factual_long, "factual")
+
+#PK function
+
+PK_advert_version <- function(data, column_name) {
+  data %>%
+    mutate(
+      advert = case_when(
+        str_detect(!!sym(column_name), "PK_1") ~ "advert.1",
+        str_detect(!!sym(column_name), "PK_2") ~ "advert.2",
+        str_detect(!!sym(column_name), "PK_3") ~ "advert.3",
+        str_detect(!!sym(column_name), "PK_4") ~ "advert.4",
+        TRUE ~ NA_character_
+      ),
+      version = case_when(
+        str_detect(!!sym(column_name), "imprint") ~ 1,
+        TRUE ~ 0
+      )
+    ) 
+}
+
+PK1_long <- PK_advert_version(PK1_long, "PK1")
+PK2_long <- PK_advert_version(PK2_long, "PK2")
+PK3_long <- PK_advert_version(PK3_long, "PK3")
+PK4_long <- PK_advert_version(PK4_long, "PK4")
+
+#informed function
+
+in_advert_version <- function(data, column_name) {
+  data %>%
+    mutate(
+      advert = case_when(
+        str_detect(!!sym(column_name), "informed_1") ~ "advert.1",
+        str_detect(!!sym(column_name), "informed_2") ~ "advert.2",
+        str_detect(!!sym(column_name), "informed_3") ~ "advert.3",
+        str_detect(!!sym(column_name), "informed_4") ~ "advert.4",
+        TRUE ~ NA_character_
+      ),
+      version = case_when(
+        str_detect(!!sym(column_name), "imprint") ~ 1,
+        TRUE ~ 0
+      )
+    ) 
+}
+
+PG_long <- in_advert_version(PG_long, "political_goal")
+informed2_long <- in_advert_version(informed2_long, "informed2")
+informed3_long <- in_advert_version(informed3_long, "informed3")
+informed4_long <- in_advert_version(informed4_long, "informed4")
+
+#convert blank spaces to NA for believe, trustworthy, factual and accurate
+
+trustworthy_long <- trustworthy_long %>%
+  mutate(trustworthy_value = na_if(trustworthy_value, ""))
+
+accurate_long <- accurate_long %>%
+  mutate(accurate_value = na_if(accurate_value, ""))
+
+believe_long <- believe_long %>%
+  mutate(believable_value = na_if(believable_value, ""))
+
+factual_long <- factual_long %>%
+  mutate(factual_value = na_if(factual_value, ""))
+
+
+#the code below creates a function that filters out redundant rows, leaving 4 for each participant
+
+clean_NA <- function(df) {
+  # Identify the column(s) ending with '_value'
+  value_cols <- names(df)[grepl("_value$", names(df))]
+  
+  # Ensure there is at least one column ending with '_value'
+  if (length(value_cols) > 0) {
+    df <- df %>%
+      filter(!is.na(.[[value_cols]])) %>%
+      distinct(id, advert, .keep_all = TRUE)
+  }
+  
+  return(df)
+}
+
+#apply this function to all dataframes, specified through thier shared name of '_long' at the end of each df
+
+df_names <- ls(pattern = "_long$")
+df_list <- mget(df_names, envir = .GlobalEnv)
+
+for (name in names(df_list)) {
+  assign(name, clean_NA(get(name)), envir = .GlobalEnv)
+}
+
+#merge the dataframes back together by matching advert, participant id and version
+
+rm_list <- list(PK1_long, PK2_long, PK3_long, PK4_long, PG_long, informed2_long, informed3_long, informed4_long, agree_long, trustworthy_long, accurate_long, believe_long, factual_long)
+
+merged_rm <- reduce(rm_list, full_join, by = c("id", "advert", "version", "Advert.1", "Advert.2", "Advert.3", "Advert.4"))
+
+#changing order of columns
+
+merged_rm <- merged_rm %>%
+  select(id, Advert.1, Advert.2, Advert.3, Advert.4, advert, version, everything())
+
+#delete the variable columns e.g., 'PK1', 'informed2'
+
+repeated_measures <- merged_rm %>%
+  select(-c(PK1, PK2, PK3, PK4, political_goal, informed2, informed3, informed4, agree, trustworthy, believable, accurate, factual))
+
+```
+
+### Mean score: persuasion knowledge and informed
+
+The code chunk below mean scores the persuasion knowledge items and the informed items. These are not the only scales that will be mean scored, but they are the only mean-scored items in the repeated measures part of the experiment (post-advert questions). Mean scoring of EPE and political trust items occur in a later section.
+
+```{r mean score PK and informed}
+
+repeated_measures <- repeated_measures %>%
+  rowwise() %>%
+  mutate(PK = mean(c(PK1_value, PK2_value, PK3_value, PK4_value)))
+
+repeated_measures <- repeated_measures %>%
+  rowwise() %>%
+  mutate(informed = mean(c(informed2_value, informed3_value, informed4_value)))
+
+#changing the order of columns
+
+repeated_measures <- repeated_measures %>%
+  select(id, Advert.1, Advert.2, Advert.3, Advert.4, advert, version, PK, informed, PG_value, agree_value, trustworthy_value, believable_value, accurate_value, factual_value, everything())
+
+```
+
+### Merged RM data frame
+
+The code below will now merge relevant variables from outside the repeated measures part of the experiment with this dataframe e.g., training condition, demographic variables and recall measures.
+
+Variable descriptions for those with unclear names:
+-   useful_rank_1 = where 'voters' were ranked by participants
+-   SM_frequency_1 = how often participants use Facebook
+
+```{r merging repeated measure and independent measure}
+
+#creating a new df with relevant variables e.g., controls for models
+#NEED TO ADD LEFT/RIGHT WING INFO INTO QUALTRICS
+
+control_measures <- data %>%
+  select(id, Training.condition, recall_num, recall_name, recall_answer, recall_correct, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, name_correct, name_incorrect, reg_know, useful_rank_1, political_interest, SM_use, SM_frequency_1, partyID, age, gender, education)
+
+#matching id number with the repeated measures dataframe so these variables are repeated across rows
+
+imprint_df <- repeated_measures %>%
+  left_join(control_measures, by = "id")
+
+#changing the order of columns: ADD IN RECALL NAME AND NUM VARIABLES
+
+imprint_df <- imprint_df %>%
+  select(id, Advert.1, Advert.2, Advert.3, Advert.4, Training.condition, advert, version, PK, informed, PG_value, agree_value, trustworthy_value, believable_value, accurate_value, factual_value, recall_num, recall_correct, recall_answer, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, name_correct, name_incorrect, useful_rank_1, political_interest, reg_know, SM_use, SM_frequency_1, partyID, age, gender, education, everything())
+
+```
+
+The code below conducts the following transformations to the variables so they are ready to be analysed:
+
+-   **Transformed to a factor**: version, advert
+-   **Transformed to a numerical variable**: PG_value, agree_value, trustworthy_value, believe_value, accurate_value, factual_value
+
+```{r preparing data frame for analysis}
+
+#functions created in earlier section
+
+imprint_df <- imprint_df %>%
+  convert_to_factor(c("version", "advert"))
+
+imprint_df <- imprint_df %>%
+  convert_to_numeric(c("PG_value", "agree_value", "trustworthy_value", "believable_value", "accurate_value", "factual_value"))
+
+```
+
+### Independent measures data frame
+
+Another aspect of the analysis will only require one row per participant, such as when testing the effect of the training condition on various outcomes e.g., confidence in regulation or epistemic political efficacy.
+
+```{r ind measures df}
+
+training_df <- data %>%
+  select(id, Training.condition, Advert.1, Advert.2, Advert.3, Advert.4, election_reg, recall_num, recall_answer, recall_correct, name_correct, name_incorrect, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, starts_with("useful_rank"), reg_know, starts_with("EPE"), starts_with("general_confidence"), starts_with("institution_trust"), democracy, political_interest, external_efficacy, internal_efficacy, SM_use, starts_with("SM_frequency"), partyID, age, gender, education)
+
+#NEED TO ADD IN LEFT-RIGHT WING TO QUALTRICS
+
+#Mean scoring EPE
+
+training_df <- training_df %>%
+  rowwise() %>%
+  mutate(EPE_mean = mean(c(EPE_1, EPE_2, EPE_3, EPE_4)))
+
+#Mean scoring trust, mistrust and cynicism
+
+training_df <- training_df %>%
+  rowwise() %>%
+  mutate(political_trust = mean(c(general_confidence_1, general_confidence_2, general_confidence_3)))
+
+training_df <- training_df %>%
+  rowwise() %>%
+  mutate(political_mistrust = mean(c(general_confidence_4, general_confidence_5, general_confidence_6)))
+
+training_df <- training_df %>%
+  rowwise() %>%
+  mutate(political_cynicism = mean(c(general_confidence_7, general_confidence_8, general_confidence_9)))
+
+
+```
+
+### Cleaning up the R environment
+
+```{r}
+
+rm(list=setdiff(ls(), c("data", "imprint_df", "training_df")))
+
+```
+

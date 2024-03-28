@@ -1,0 +1,2211 @@
+---
+title: "Experiment testing the impact of digital imprints on organic campaign material: analysis plan generated from pilot study data"
+author: 
+-   name: Kate Dommett
+-   name: Tom Stafford
+-   name: Junyan Zhu
+-   name: Hazel Gordon
+output: 
+  html_document:
+    toc: true
+    self_contained: true
+---
+
+<style>
+body {
+  padding: 60px; /* Adjust the padding around the body of the document */
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<details>
+
+## Preparing the dataset {.tabset}
+
+### Libraries used
+
+```{r libraries needed}
+
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+
+```
+
+### Reading in data and exclusions
+
+```{r read df}
+
+pilotdata <- read.csv("pilot_data.csv")
+
+#EXCLUSION FOR PILOT DATA ONLY (MISSING VALUE, now forced response added on qualtrics)
+
+n <- 34
+pilotdata <- pilotdata[-n, ]
+
+#extract relevant variables into new data frame
+
+data <- pilotdata %>%
+  select(Training.condition, Advert.1, Advert.2, Advert.3, Advert.4, starts_with("PK"), starts_with("agree"), starts_with("informed"), starts_with("accurate"), starts_with("believable"), starts_with("trustworthy"), starts_with("factual"), election_reg, recall_num, recall_name, starts_with("useful"), reg_know, starts_with("EPE"), starts_with("general_confidence"), starts_with("institution"), democracy, political_interest, external_efficacy, internal_efficacy, starts_with("SM"), partyID, age, gender, education)
+
+#removing top 2 rows
+
+data <- data %>%
+  slice(-c(1, 2))
+
+#give each participant a number identifier
+
+data <- data %>% 
+  mutate(id = row_number())
+
+#moving id identifier to the front
+
+data <- data %>%
+  select(id, everything())
+
+```
+
+### Agree/disagree item transformations
+
+The code below will convert all variables with response measurement of strongly disagree to strongly agree from a character variable to a numerical scale of 1-7. One item also needs to be reverse scored:
+
+- Informed item 3: 'I am not sure who is behind this material'
+
+There are also attention checks in the dataset that need to be removed **once exclusions have been dealt with**:
+
+- informed_2_5
+- informed_2imprint_5
+- EPE_5
+
+Below creates a functions that will be applied to all agree-disagree response formats in the dataset - all ones that start with PK, agree, informed, EPE and general_confidence. The second function then reverse scores informed item three across the eight advert variations.
+
+**different scale options for agree, epe and general_confidence**
+
+```{r convert to numeric}
+
+#converting to numeric variables from character for agree - disagree
+
+#THIS CURRENTLY WON'T WORK FOR AGREE, EPE, INFORMED and GENERAL: CHANGE RESPONSE OPTIONS ON QUALTRICS
+
+# Define the function to convert responses to numeric
+convert_responses_to_numeric <- function(response) {
+  # Define the mapping from response to numeric value
+  mapping <- c(
+    "Strongly disagree" = 1,
+    "Somewhat disagree" = 2,
+    "Slightly disagree" = 3,
+    "Neither agree nor disagree" = 4,
+    "Slightly agree" = 5,
+    "Somewhat agree" = 6,
+    "Strongly agree" = 7
+  )
+  
+  # Replace the character response with its corresponding numeric value
+  return(mapping[response])
+}
+
+convert_2 <- function(response) {
+
+  mapping <- c(
+    "Strongly disagree" = 1,
+    "Disagree" = 2,
+    "Somewhat disagree" = 3,
+    "Neither agree nor disagree" = 4,
+    "Somewhat agree" = 5,
+    "Agree" = 6,
+    "Strongly agree" = 7
+  )
+  
+  return(mapping[response])
+}
+
+#applying this function to the data frame (two separate functions to account for differences in response options)
+
+data <- data %>%
+  mutate(across(c(starts_with("PK")), ~convert_responses_to_numeric(.x)))
+         
+data <- data %>%
+  mutate(across(c(starts_with("informed"), starts_with("agree"), starts_with("EPE"), starts_with("general")), ~convert_2(.x)))
+
+#reverse scoring informed item 3
+
+reverse_code <- function(response) {
+  # Define the mapping from original to reversed scores
+  mapping <- c(1, 2, 3, 4, 5, 6, 7)
+  names(mapping) <- c(7, 6, 5, 4, 3, 2, 1)
+  
+  # Use the response as a name to look up in the mapping
+  return(as.numeric(names(mapping)[match(response, mapping)]))
+}
+
+data <- data %>%
+  mutate(across(c(informed_1_3, informed_1imprint_3, informed_2_3, informed_2imprint_3, informed_3_3, informed_3imprint_3, informed_4_3, informed_4imprint_3), ~reverse_code(.x)))
+
+#removing the attention check columns from the dataset
+
+data <- data %>%
+  select(-informed_2_5, -informed_2imprint_5, -EPE_5)
+
+```
+
+### Variable tranformations for both RM and IM dataframes
+
+The code below conducts the following transformations to the variables that will be present in both the repeated measures and independent measures data frames so they are ready to be analysed:
+
+-   **Transformed to a factor**: advert.1, advert.2, advert.3, advert.4, Training.condition, reg_know, SM_use, starts with: SM_frequency, party_ID, gender, education
+
+-   **Transformed to a numerical variable**: election_reg, starts with: useful_rank, starts with: institution_trust, democracy, political_interest, external_efficacy, internal_efficacy, age
+
+*Some variables will only be present in the repeated measures data frame and will be created later.*
+
+```{r convert to factor function}
+
+#creating factor variables through use of a function
+
+convert_to_factor <- function(df, cols) {
+  df %>%
+    mutate(across(all_of(cols), as.factor))
+}
+
+data <- data %>%
+  convert_to_factor(c("Advert.1", "Advert.2", "Advert.3", "Advert.4", "SM_frequency_1", "SM_frequency_2", "SM_frequency_3", "SM_frequency_4", "SM_frequency_5", "SM_frequency_6", "Training.condition", "reg_know", "SM_use", "partyID", "gender", "education"))
+
+#Setting reference groups for: reg_know, SM_use, SM_frequency, gender, education
+
+#regulation knowledge
+
+reg_response_order <- c("There are no regulatory controls on any type of political advertising during UK elections", "All political advertising is regulated by rules set by the UK government, but there is one set of rules for advertising on television and radio and a different set of rules for advertising on the internet and social media", "All political advertising (whether on television, radio, in newspapers or the internet) is subject to the same rules set by the UK government", "Not sure")
+
+data <- data %>%
+  mutate(across(reg_know, ~factor(.x, levels = reg_response_order)))
+
+#Social media use
+  
+use_response_order <- c("None, No time at all ", "Less than 1/2 hour ", "1/2 hour to 1 hour ", "1 to 2 hours ",  "Not sure")
+
+data <- data %>%
+  mutate(across(SM_use, ~factor(.x, levels = use_response_order)))
+  
+#SM frequency use
+  
+freq_response_order <- c("Never",
+                         "Less than once a week",
+                         "Once a week\t",
+                         "Once every couple of days\t",
+                         "Once a day\t",
+                         "2-5 times a day\t",
+                         "More than five times a day\t")
+
+data <- data %>%
+  mutate(across(starts_with("SM_frequency"), ~factor(.x, levels = freq_response_order)))
+
+#gender OTHER WILL BE REMOVED FOR MAIN STUDY
+
+gender_response_order <- c("Female", "Male", "Non-binary / third gender", "Other, please specify")
+
+data <- data %>%
+  mutate(across(gender, ~factor(.x, levels = gender_response_order)))
+
+#Education level NOT ALL LEVELS USED IN PILOT, NEEDS UPDATING WHEN MAIN
+
+ed_response_order <- c("GCSE level, or equivalent", "A-level, or equivalent", "Undergraduate University (e.g. BA, B.Sc, B.Ed)", "Postgraduate (e.g. M.Sc, Ph.D)")
+
+data <- data %>%
+  mutate(across(education, ~factor(.x, levels = ed_response_order)))
+
+
+```
+
+```{r convert to numeric function}
+
+#Need to first change response options from categories to numbers for: election_reg, institution_trust, democracy, political_interest, internal_efficacy, external_efficacy, age
+
+#Confidence in electoral regulation
+
+data <- data %>%
+  mutate(election_reg = case_when(
+    election_reg == "Completely insufficient" ~ 1,
+    election_reg == "Mostly insufficient" ~ 2,
+    election_reg == "Slightly insufficient" ~ 3,
+    election_reg == "No opinion/not sure" ~ 4,
+    election_reg == "Slightly sufficient" ~ 5,
+    election_reg == "Mostly sufficient" ~ 6,
+    election_reg == "Completely sufficient" ~ 7
+  ))
+
+#CHANGES TO INSTITUTION TRUST WILL NOT BE NEEDED FOR FINAL DS
+
+#changing '0 - none at all' to 0 for institution_trust
+
+data <- data %>%
+  mutate(across(starts_with("institution_trust"), ~ case_when(
+    .x == "0 - none at all" ~ 0,
+    TRUE ~ as.numeric(.x)
+  )))
+
+#Converting 'democracy' to a numeric variable
+
+data <- data %>%
+  mutate(democracy = case_when(
+    democracy == "Very dissatisfied" ~ 1,
+    democracy == "A little dissatisfied" ~ 2,
+    democracy == "Fairly satisfied" ~ 3,
+    democracy == "Very satisfied" ~ 4
+  ))
+
+#converting political interest to a numerical variable
+
+data <- data %>%
+  mutate(political_interest = case_when(
+    political_interest == "Not at all interested" ~ 1,
+    political_interest == "Not very interested" ~ 2,
+    political_interest == "Slightly interested" ~ 3,
+    political_interest == "Fairly interested" ~ 4,
+    political_interest == "Very interested " ~ 5
+  ))
+
+#converting internal and external efficacy to numeric, 5 options
+
+data <- data %>%
+  mutate(internal_efficacy = case_when(
+    internal_efficacy == "Not at all " ~ 1,
+    internal_efficacy == "A little " ~ 2,
+    internal_efficacy == "A moderate amount  " ~ 3,
+    internal_efficacy == "A lot " ~ 4,
+    internal_efficacy == "A great deal " ~ 5
+  ))
+
+data <- data %>%
+  mutate(external_efficacy = case_when(
+    external_efficacy == "Not at all " ~ 1,
+    external_efficacy == "A little " ~ 2,
+    external_efficacy == "A moderate amount  " ~ 3,
+    external_efficacy == "A lot " ~ 4,
+    external_efficacy == "A great deal " ~ 5
+  ))
+
+#transforming age from a date to an age
+
+current_year <- format(Sys.Date(), "%Y")
+
+current_year <- as.numeric(current_year)
+data$age <- as.numeric(data$age)
+
+data$age <- current_year - data$age
+
+#creating numeric variables through the use of a function
+
+convert_to_numeric <- function(df, cols) {
+  df %>%
+    mutate(across(all_of(cols), as.numeric))
+}
+
+#Convert all other variables to numeric
+
+data <- data %>%
+  convert_to_numeric(c("useful_rank_1", "useful_rank_2", "useful_rank_3", "useful_rank_4", "useful_rank_5", "useful_rank_6"))
+
+```
+
+### Recall variable transformations
+
+Transformation of recall variables:
+-   **Recall_num**: two new columns need to be created specifying those who picked 'not sure' versus those who chose an answer, then those who were correct, chose 2, and those who were incorrect. 
+-   **Recall_name**: 8 potential columns will need to be created with a binary response, indicating whether each name option was identified e.g. 'common sense collective'. 
+
+- The correct identification options are:
+  - Common sense collective - advert 1
+  - Breaking barriers alliance - advert 2
+  - Speak freely Inc.- advert 3
+  - Campaign for a better Britain - advert 4
+  
+- Incorrect options
+  - Future first
+  - The peoples movement
+  - Voice for the people
+  - Hope something - removed from qualtrics and replaced with ad 4
+  - All together
+  
+A NAME IS MISSING FROM THE LIST IN QUALTRICS, CBB, NOW ADDED
+
+
+```{r recall name and num tranformations}
+
+#Recall number transformation
+
+#column one estimating perceived informedness, recall_answer
+
+data <- data %>%
+  mutate(recall_answer = 
+           case_when(
+             recall_num == "Not sure" ~ 0,
+             TRUE ~ 1
+           ))
+
+#column two showing actual informedness, recall_correct
+
+data <- data %>%
+  mutate(recall_correct = 
+           case_when(
+             recall_num == 2 ~ "correct",
+             TRUE ~ "incorrect"
+           ))
+
+#Recall name transformation, correct responses
+
+data <- data %>%
+  mutate(CSC = case_when(
+    str_detect(recall_name, "Common Sense Collective") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(BBA = case_when(
+    str_detect(recall_name, "Breaking Barriers Alliance") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(SFI = case_when(
+    str_detect(recall_name, "Speak Freely Inc") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(CBB = case_when(
+    str_detect(recall_name, "Campaign for a better Britain") ~ 1,
+    TRUE ~ 0
+  ))
+
+#incorrect responses
+
+data <- data %>%
+  mutate(FF = case_when(
+    str_detect(recall_name, "Future First") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(TPM = case_when(
+    str_detect(recall_name, "The People’s movement") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(VFP = case_when(
+    str_detect(recall_name, "Voice for the People") ~ 1,
+    TRUE ~ 0
+  ))
+
+data <- data %>%
+  mutate(AT = case_when(
+    str_detect(recall_name, "All Together") ~ 1,
+    TRUE ~ 0
+  ))
+
+#number of correct names recalled, name_correct
+
+data <- data %>%
+  mutate(name_correct = CSC + BBA + SFI + CBB)
+
+#number of incorrect names recalled, name_incorrect
+
+#add incorrect columns together
+
+data <- data %>%
+  mutate(name_incorrect = FF + TPM + VFP + AT)
+
+#convert campaign names to factors
+
+data <- data %>%
+  convert_to_factor(c("recall_answer", "recall_correct", "CSC", "BBA", "SFI", "CBB", "FF", "TPM", "VFP", "AT"))
+
+```
+
+### Repeated measures dataframe
+
+The code below turns the wide data into long data, creating 4 rows for each participant and only one column for each of the outcome variables: persuasion knowledge, political goal, informedness, agreement, believability, trustworthiness, accurateness, factual. Extra columns also specify the advert viewed and the version (imprint or no imprint).
+
+```{r convert wide to long data for repeated measures df}
+
+#create a new dataframe with only the repeated measures (post-advert) variables
+
+RM <- data %>%
+  select(id, starts_with("Advert."), starts_with("PK"), starts_with("agree"), starts_with("informed"), starts_with("accurate"), starts_with("believable"), starts_with("trustworthy"), starts_with("factual"))
+
+#when first converted into long data, eight rows are generated for each participant for the eight different advert variations, but many columns contain NA.
+
+#persuasion knowledge df, each item separate
+
+PK1_long <- RM %>%
+  select(id, starts_with("Advert."), PK_1_1, PK_1imprint_1, PK_2_1, PK_2imprint_1, PK_3_1, PK_3imprint_1, PK_4_1, PK_4imprint_1) %>%
+  pivot_longer(
+    cols = c(PK_1_1, PK_1imprint_1, PK_2_1, PK_2imprint_1, PK_3_1, PK_3imprint_1, PK_4_1, PK_4imprint_1),
+    names_to = "PK1",
+    values_to = "PK1_value"
+  )
+
+PK2_long <- RM %>%
+  select(id, starts_with("Advert."), PK_1_2, PK_1imprint_2, PK_2_2, PK_2imprint_2, PK_3_2, PK_3imprint_2, PK_4_2, PK_4imprint_2) %>%
+  pivot_longer(
+    cols = c(PK_1_2, PK_1imprint_2, PK_2_2, PK_2imprint_2, PK_3_2, PK_3imprint_2, PK_4_2, PK_4imprint_2),
+    names_to = "PK2",
+    values_to = "PK2_value"
+  )
+
+PK3_long <- RM %>%
+  select(id, starts_with("Advert."), PK_1_3, PK_1imprint_3, PK_2_3, PK_2imprint_3, PK_3_3, PK_3imprint_3, PK_4_3, PK_4imprint_3) %>%
+  pivot_longer(
+    cols = c(PK_1_3, PK_1imprint_3, PK_2_3, PK_2imprint_3, PK_3_3, PK_3imprint_3, PK_4_3, PK_4imprint_3),
+    names_to = "PK3",
+    values_to = "PK3_value"
+  )
+
+PK4_long <- RM %>%
+  select(id, starts_with("Advert."), PK_1_4, PK_1imprint_4, PK_2_4, PK_2imprint_4, PK_3_4, PK_3imprint_4, PK_4_4, PK_4imprint_4) %>%
+  pivot_longer(
+    cols = c(PK_1_4, PK_1imprint_4, PK_2_4, PK_2imprint_4, PK_3_4, PK_3imprint_4, PK_4_4, PK_4imprint_4),
+    names_to = "PK4",
+    values_to = "PK4_value"
+  )
+
+
+#political goal df, informed item 1
+
+PG_long <- RM %>%
+  select(id, starts_with("Advert."), informed_1_1, informed_1imprint_1, informed_2_1, informed_2imprint_1, informed_3_1, informed_3imprint_1, informed_4_1, informed_4imprint_1) %>%
+  pivot_longer(
+    cols = c(informed_1_1, informed_1imprint_1, informed_2_1, informed_2imprint_1, informed_3_1, informed_3imprint_1, informed_4_1, informed_4imprint_1),
+    names_to = "political_goal",
+    values_to = "PG_value"
+  )
+
+#informed df, each item separate
+
+informed2_long <- RM %>%
+  select(id, starts_with("Advert."), informed_1_2, informed_1imprint_2, informed_2_2, informed_2imprint_2, informed_3_2, informed_3imprint_2, informed_4_2, informed_4imprint_2) %>%
+  pivot_longer(
+    cols = c(informed_1_2, informed_1imprint_2, informed_2_2, informed_2imprint_2, informed_3_2, informed_3imprint_2, informed_4_2, informed_4imprint_2),
+    names_to = "informed2",
+    values_to = "informed2_value"
+  )
+
+informed3_long <- RM %>%
+  select(id, starts_with("Advert."), informed_1_3, informed_1imprint_3, informed_2_3, informed_2imprint_3, informed_3_3, informed_3imprint_3, informed_4_3, informed_4imprint_3) %>%
+  pivot_longer(
+    cols = c(informed_1_3, informed_1imprint_3, informed_2_3, informed_2imprint_3, informed_3_3, informed_3imprint_3, informed_4_3, informed_4imprint_3),
+    names_to = "informed3",
+    values_to = "informed3_value"
+  )
+
+informed4_long <- RM %>%
+  select(id, starts_with("Advert."), informed_1_4, informed_1imprint_4, informed_2_4, informed_2imprint_4, informed_3_4, informed_3imprint_4, informed_4_4, informed_4imprint_4) %>%
+  pivot_longer(
+    cols = c(informed_1_4, informed_1imprint_4, informed_2_4, informed_2imprint_4, informed_3_4, informed_3imprint_4, informed_4_4, informed_4imprint_4),
+    names_to = "informed4",
+    values_to = "informed4_value"
+  )
+
+#agreement df
+
+agree_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("agree")) %>%
+  pivot_longer(
+    cols = starts_with("agree"),
+    names_to = "agree",
+    values_to = "agree_value"
+  )
+
+#trustworthy df
+
+trustworthy_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("trustworthy")) %>%
+  pivot_longer(
+    cols = starts_with("trustworthy"),
+    names_to = "trustworthy",
+    values_to = "trustworthy_value"
+  )
+
+#believability df
+
+believe_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("believable")) %>%
+  pivot_longer(
+    cols = starts_with("believable"),
+    names_to = "believable",
+    values_to = "believable_value"
+  )
+
+#accurateness df
+
+accurate_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("accurate")) %>%
+  pivot_longer(
+    cols = starts_with("accurate"),
+    names_to = "accurate",
+    values_to = "accurate_value"
+  )
+
+#factual df
+
+factual_long <- RM %>%
+  select(id, starts_with("Advert."), starts_with("factual")) %>%
+  pivot_longer(
+    cols = starts_with("factual"),
+    names_to = "factual",
+    values_to = "factual_value"
+  )
+
+#Create two new variables in each indicating advert type and version viewed, so that the dataframes can be merged by these two columns
+
+#Below is three functions that can be applied to each df to create new variables.
+
+# Function to add 'advert' and 'version' based on patterns in a specified column
+add_advert_version <- function(data, column_name) {
+  data %>%
+    mutate(
+      advert = case_when(
+        str_detect(!!sym(column_name), "1") ~ "advert.1",
+        str_detect(!!sym(column_name), "2") ~ "advert.2",
+        str_detect(!!sym(column_name), "3") ~ "advert.3",
+        str_detect(!!sym(column_name), "4") ~ "advert.4",
+        TRUE ~ NA_character_
+      ),
+      version = case_when(
+        str_detect(!!sym(column_name), "imprint") ~ 1,
+        TRUE ~ 0
+      )
+    ) 
+}
+
+#apply function for agree, trust, believe, factual, accurate
+
+agree_long <- add_advert_version(agree_long, "agree")
+trustworthy_long <- add_advert_version(trustworthy_long, "trustworthy")
+believe_long <- add_advert_version(believe_long, "believable")
+accurate_long <- add_advert_version(accurate_long, "accurate")
+factual_long <- add_advert_version(factual_long, "factual")
+
+#PK function
+
+PK_advert_version <- function(data, column_name) {
+  data %>%
+    mutate(
+      advert = case_when(
+        str_detect(!!sym(column_name), "PK_1") ~ "advert.1",
+        str_detect(!!sym(column_name), "PK_2") ~ "advert.2",
+        str_detect(!!sym(column_name), "PK_3") ~ "advert.3",
+        str_detect(!!sym(column_name), "PK_4") ~ "advert.4",
+        TRUE ~ NA_character_
+      ),
+      version = case_when(
+        str_detect(!!sym(column_name), "imprint") ~ 1,
+        TRUE ~ 0
+      )
+    ) 
+}
+
+PK1_long <- PK_advert_version(PK1_long, "PK1")
+PK2_long <- PK_advert_version(PK2_long, "PK2")
+PK3_long <- PK_advert_version(PK3_long, "PK3")
+PK4_long <- PK_advert_version(PK4_long, "PK4")
+
+#informed function
+
+in_advert_version <- function(data, column_name) {
+  data %>%
+    mutate(
+      advert = case_when(
+        str_detect(!!sym(column_name), "informed_1") ~ "advert.1",
+        str_detect(!!sym(column_name), "informed_2") ~ "advert.2",
+        str_detect(!!sym(column_name), "informed_3") ~ "advert.3",
+        str_detect(!!sym(column_name), "informed_4") ~ "advert.4",
+        TRUE ~ NA_character_
+      ),
+      version = case_when(
+        str_detect(!!sym(column_name), "imprint") ~ 1,
+        TRUE ~ 0
+      )
+    ) 
+}
+
+PG_long <- in_advert_version(PG_long, "political_goal")
+informed2_long <- in_advert_version(informed2_long, "informed2")
+informed3_long <- in_advert_version(informed3_long, "informed3")
+informed4_long <- in_advert_version(informed4_long, "informed4")
+
+#convert blank spaces to NA for believe, trustworthy, factual and accurate
+
+trustworthy_long <- trustworthy_long %>%
+  mutate(trustworthy_value = na_if(trustworthy_value, ""))
+
+accurate_long <- accurate_long %>%
+  mutate(accurate_value = na_if(accurate_value, ""))
+
+believe_long <- believe_long %>%
+  mutate(believable_value = na_if(believable_value, ""))
+
+factual_long <- factual_long %>%
+  mutate(factual_value = na_if(factual_value, ""))
+
+
+#the code below creates a function that filters out redundant rows, leaving 4 for each participant
+
+clean_NA <- function(df) {
+  # Identify the column(s) ending with '_value'
+  value_cols <- names(df)[grepl("_value$", names(df))]
+  
+  # Ensure there is at least one column ending with '_value'
+  if (length(value_cols) > 0) {
+    df <- df %>%
+      filter(!is.na(.[[value_cols]])) %>%
+      distinct(id, advert, .keep_all = TRUE)
+  }
+  
+  return(df)
+}
+
+#apply this function to all dataframes, specified through thier shared name of '_long' at the end of each df
+
+df_names <- ls(pattern = "_long$")
+df_list <- mget(df_names, envir = .GlobalEnv)
+
+for (name in names(df_list)) {
+  assign(name, clean_NA(get(name)), envir = .GlobalEnv)
+}
+
+#merge the dataframes back together by matching advert, participant id and version
+
+rm_list <- list(PK1_long, PK2_long, PK3_long, PK4_long, PG_long, informed2_long, informed3_long, informed4_long, agree_long, trustworthy_long, accurate_long, believe_long, factual_long)
+
+merged_rm <- reduce(rm_list, full_join, by = c("id", "advert", "version", "Advert.1", "Advert.2", "Advert.3", "Advert.4"))
+
+#changing order of columns
+
+merged_rm <- merged_rm %>%
+  select(id, Advert.1, Advert.2, Advert.3, Advert.4, advert, version, everything())
+
+#delete the variable columns e.g., 'PK1', 'informed2'
+
+repeated_measures <- merged_rm %>%
+  select(-c(PK1, PK2, PK3, PK4, political_goal, informed2, informed3, informed4, agree, trustworthy, believable, accurate, factual))
+
+```
+
+The code chunk below mean scores the persuasion knowledge items and the informed items. These are not the only scales that will be mean scored, but they are the only mean-scored items in the repeated measures part of the experiment (post-advert questions). Mean scoring of EPE and political trust items occur in a later section.
+
+```{r mean score PK and informed}
+
+repeated_measures <- repeated_measures %>%
+  rowwise() %>%
+  mutate(PK = mean(c(PK1_value, PK2_value, PK3_value, PK4_value)))
+
+repeated_measures <- repeated_measures %>%
+  rowwise() %>%
+  mutate(informed = mean(c(informed2_value, informed3_value, informed4_value)))
+
+#changing the order of columns
+
+repeated_measures <- repeated_measures %>%
+  select(id, Advert.1, Advert.2, Advert.3, Advert.4, advert, version, PK, informed, PG_value, agree_value, trustworthy_value, believable_value, accurate_value, factual_value, everything())
+
+```
+
+### Merged repeated measures data frame
+
+The code below will now merge relevant variables from outside the repeated measures part of the experiment with this dataframe e.g., training condition, demographic variables and recall measures.
+
+Variable descriptions for those with unclear names:
+-   useful_rank_1 = where 'voters' were ranked by participants
+-   SM_frequency_1 = how often participants use Facebook
+
+```{r merging repeated measure and independent measure}
+
+#creating a new df with relevant variables e.g., controls for models
+#NEED TO ADD LEFT/RIGHT WING INFO INTO QUALTRICS
+
+control_measures <- data %>%
+  select(id, Training.condition, recall_num, recall_name, recall_answer, recall_correct, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, reg_know, useful_rank_1, political_interest, SM_use, SM_frequency_1, partyID, age, gender, education)
+
+#matching id number with the repeated measures dataframe so these variables are repeated across rows
+
+imprint_df <- repeated_measures %>%
+  left_join(control_measures, by = "id")
+
+#changing the order of columns
+
+imprint_df <- imprint_df %>%
+  select(id, Advert.1, Advert.2, Advert.3, Advert.4, Training.condition, advert, version, PK, informed, PG_value, agree_value, trustworthy_value, believable_value, accurate_value, factual_value, recall_num, recall_correct, recall_answer, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, useful_rank_1, political_interest, reg_know, SM_use, SM_frequency_1, partyID, age, gender, education, everything())
+
+```
+
+The code below conducts the following transformations to the variables so they are ready to be analysed:
+
+-   **Transformed to a factor**: version, advert
+-   **Transformed to a numerical variable**: PG_value, agree_value, trustworthy_value, believe_value, accurate_value, factual_value
+
+```{r preparing data frame for analysis}
+
+#functions created in earlier section
+
+imprint_df <- imprint_df %>%
+  convert_to_factor(c("version", "advert"))
+
+imprint_df <- imprint_df %>%
+  convert_to_numeric(c("PG_value", "agree_value", "trustworthy_value", "believable_value", "accurate_value", "factual_value"))
+
+```
+
+### Independent measures data frame
+
+Another aspect of the analysis will only require one row per participant, such as when testing the effect of the training condition on various outcomes e.g., confidence in regulation or epistemic political efficacy.
+
+```{r ind measures df}
+
+training_df <- data %>%
+  select(id, Training.condition, Advert.1, Advert.2, Advert.3, Advert.4, election_reg, recall_num, recall_answer, recall_correct, name_correct, name_incorrect, CSC, BBA, SFI, CBB, FF, TPM, VFP, AT, starts_with("useful_rank"), reg_know, starts_with("EPE"), starts_with("general_confidence"), starts_with("institution_trust"), democracy, political_interest, external_efficacy, internal_efficacy, SM_use, starts_with("SM_frequency"), partyID, age, gender, education)
+
+#NEED TO ADD IN LEFT-RIGHT WING TO QUALTRICS
+
+#Mean scoring EPE
+
+training_df <- training_df %>%
+  rowwise() %>%
+  mutate(EPE_mean = mean(c(EPE_1, EPE_2, EPE_3, EPE_4)))
+
+#Mean scoring trust, mistrust and cynicism
+
+training_df <- training_df %>%
+  rowwise() %>%
+  mutate(political_trust = mean(c(general_confidence_1, general_confidence_2, general_confidence_3)))
+
+training_df <- training_df %>%
+  rowwise() %>%
+  mutate(political_mistrust = mean(c(general_confidence_4, general_confidence_5, general_confidence_6)))
+
+training_df <- training_df %>%
+  rowwise() %>%
+  mutate(political_cynicism = mean(c(general_confidence_7, general_confidence_8, general_confidence_9)))
+
+```
+
+### Cleaning up the R environment
+
+```{r}
+
+rm(list=setdiff(ls(), c("data", "imprint_df", "training_df")))
+
+```
+
+</details>
+
+This document relies on the correct data frames having been formed from the code above which can be viewed under 'details'. This information is also stored in a seperate R Markdown document 'datawrangling_code.Rmd'. The correct data frames used in the following analyses are called: imprint_df and training_df. Some hypotheses are tested using the former dataframe, which includes four rows for each participant to capture the repeated measures part of the experiment. Some hypotheses are tested using the latter dataframe, which includes only one row per participant.
+
+### Document purpose
+
+The purpose of this document is to develop an analysis plan from the pilot data before the main dataset is collected. The pilot results themselves are not interpreted or used, rather the models and visualisations have been created to increase clarity on how the measures address the hypotheses, and how the hypotheses address the research question. Faults in the pilot survey are also checked for.
+
+### Research themes and questions
+
+Research theme 1: the effect of viewing a digital imprint on subsequent evaluations
+
+- **Research question 1a**: Does the presence of a digital imprint increase citizens knowledge about the source of digital campaign material?
+- **Research question 1b**: Does the presence of a digital imprint increase the perceived trustworthiness of the campaign material?
+
+Research theme 2: the effect of being informed about the purpose of digital imprints on subsequent evaluations
+
+- **Research question 2a**: How does being informed about the purpose of digital imprints affect citizens' knowledge of the source of campaign material?
+- **Research question 2b**: How does being informed about the purpose of digital imprints affect citizens' perceptions of the trustworthiness of such material?
+- **Research question 2c**: How does being informed about the purpose of a digital imprint affect citizen views on the sufficiency of current regulatory oversight?
+
+Research theme 3: citizen perceptions of direct and indirect transparency on citizen evaluations
+
+- **Research question 3a**: Do citizens view information transparency information useful for the self and for others? 
+- **Research question 3b**: Does the perception of how useful transparency information is to the self affect citizen trust in campaign material and confidence in regulatory oversight?
+
+### Hypotheses
+
+Research question 1a:
+
+- H1a: Digital imprints *will* increase respondents knowledge about the source of a piece of digital campaign material, with regards to the campaigners political and persuasive intent.
+- H1b: The presence of a digital imprint *will not* increase respondent’s memory of the names of campaigners whose post they viewed.
+- H1c: The presence of a digital imprint *will not* increase respondent’s perception that they are more informed about the source of campaign material.
+
+Research question 1b:
+
+- H2: The presence of a digital imprint that does not communicate partisan cues on campaign material from a non-party campaign group will not affect the perceived trustworthiness of the campaign material.
+
+Research question 2a:
+
+- H3a: Those who are informed about the purpose of digital imprints, thus are primed to notice their presence and understand their purpose, will pay more attention to the presence or absence of source transparency when evaluating a piece of campaign material.
+- H3b: Those who are informed about the purpose of digital imprints, thus are primed to notice their presence and understand their purpose, will pay more attention to the source of a campaign post.
+- H3c: Those who are informed about the purpose of digital imprints will perceive themselves as informed about the source of a piece of material *if and only if* a digital imprint is present with the content.
+- H3d: Those who are informed about the purpose of digital imprints will be more likely to both have confidence in their knowledge of the source, as well as recall this information with more accuracy.
+
+Research question 2b:
+
+- H4: Those who are informed about the purpose of digital imprints will perceive campaign content as more trustworthy *if and only if* a digital imprint is present with the content.
+
+Research question 2c:
+
+- H5: Those who are informed about the purpose of an imprint are more likely to perceive campaign laws as sufficient compared to those who are not informed about the purpose.
+
+Research question 3a:
+
+- H6: Individuals will vary in how relevant they perceive transparency information to be for voters (the self) or other actors.
+
+Research question 3b:
+
+- H7a: Variations in perceptions of the relevancy of campaign information will predict how trustworthy campaign materials are evaluated to be, with ranking transparency information as incrementally more useful to voters decreasing the likelihood campaign content will be perceived as trustworthy.
+- H7b: Variations in perceptions of the relevancy of campaign information will predict the perceived sufficiency of regulatory oversight, with ranking transparency information as incrementally more useful to voters decreasing the likelihood campaign regulation will be perceived as sufficient.
+
+## Outline of key measures
+
+### Outcome 1: informedness
+
+This experiment investigates whether claims that digital imprints will better inform citizens about the source of a piece of campaign material are supported. Informedness is tested in multiple ways: through persuasion knowledge, political goal recognition, perceived informedness, recall of the source and recall of transparency.
+
+<p align="center"> **Persuasion knowledge and political goal recognition** </p>
+
+The persuasion knowledge model was developed in a consumer advertising context by Freistad and Wright and posits that individuals build up defenses to persuasive attempts, eventually resisting them through a range of psychological defense strategies when they recognise a persuasive agent is attempting to influence them. Distinguishing political advertising from organic social media posting is an important part of being informed when navigating online environments. It is expected that the presence of a digital imprint with the campaign material will lead to higher recognition that the material aims to persuade the viewer of a certain viewpoint.
+
+The campaign posts that include digital imprints are expected to lead to higher persuasion knowledge and higher political goal recognition compared to those that do not, particularly in those who were in the training condition i.e. informed about the purpose of digital imprints immediately prior to viewing the campaign posts.
+
+<p align="center"> **Perceived informedness** </p>
+
+This measure captures whether participants have confidence that they are informed, regardless of the reality of what information they actually have. It is a distinct construct as perceived informedness does not necessary correlate with actual informedness. However, it is expected that the training condition increase the accuracy with which participants can identify whether they have been adequately informed by a piece of campaign material, in that when an imprint is absent they will perceive themselves as less informed, and when it is present as more informed.
+
+<p align="center"> **Name recall** </p>
+
+Informedness through name recall tests if the name of the campaign group can be identified once the advertisements themselves are no longer visible. This is used as a proxy for processing of the source information. It is hypothesised names will be remembered better when the post was viewed with a digital imprint compared to those that were not, and this will particularly be the case for those in the training condition.
+
+<p align="center"> **Transparency recall** </p>
+
+Informedness through transparency recall tests the extent to which participants are able to recall how many campaign images they viewed contained transparency information. This is used as a proxy for compliance recognition, and is expected to be higher in those who were 'trained'.
+
+<p align="center"> **Actual and percieved informedness** </p>
+
+The above measures allow distinguishing between actual and perceived informedness, which is expected to be affected by the training condition. Increased perceived informedness may lead to more confidence when answering the recall measures, but not necessarily more accuracy. Thus, we test whether the training condition improves both perceived and actual recall.
+
+<p align="center"> **Real world justification of informedness measures**</p>
+
+-   Increased persuasion knowledge and political goal recognition would support digital imprints lead citizens to a deeper understanding of *how* posts viewed in the online environment are trying to influence their vote choice.
+-   Increased perceived informedness would support digital imprints lead to more confidence in citizens perception that they are informed about campaigners during election times.
+-   Increased campaign name recall would support digital imprints lead citizens to a deeper understanding of *who specifically* in the online environment is trying to influence their vote choice. 
+-   Increased transparency recall would support citizens can use digital imprints to determine which campaigners are compliant with electoral law.
+
+<p align="center">**Advert level variations in informedness**</p>
+
+Order effects are accounted for with randomisation of the advertisements. However, certain aspects of the campaign material may have made it more memorable, regardless of whether the digital imprints are present. Thus, advert-level variations in recall are also checked. As realistic campaign posts are shown to respondents, with a variety of visual and content differences, this study tests material with high real life validity to investigate if digital imprints, in the forms they will actually be seen in, are able to stand out and consistently increase informedness, regardless of the content of the post or the form in which they appear. Understanding these divergences is essential knowledge for the Electoral Commission, as they have thus far noticed that the use of digital imprints is not consistent, with the requirements allowing for a range of different disclosure formats. For this reason, a variety of Facebook post aesthetics are tested: 2 are scrolling on a newsfeed, 1 is clicking to enlarge an image, and 1 is viewing the page of a campaign group and seeing their top post. The style of Facebook, e.g. fonts and post/page structure, is kept constant.
+
+Furthermore, the political intent of the post is more obvious in some posts compared to others. However, in all posts the political nature of the content is expected to be clear, and thus not difficult for respondents to identify. This is important to ensure regulatory compliance can be recognised.
+
+#### Measurements of informedness
+
+Actual informedness:
+
+-   **Persuasion knowledge**, numerical scale 1-7
+-   **Recognition of political goal**, numerical scale 1-7
+-   **Correct recall of the campaign groups names**, numerical scale 0-4, number of correct campaign group names recalled
+-   **Transparency/number recall**, binary variable with response '2' = correct, any other response = incorrect
+
+Perceived informedness:
+
+-   **Perceived informedness**, numerical scale 1-7
+-   **Incorrect recall of the campaign groups names**, numerical scale 0-4, number of incorrect campaign groups recalled.
+-   **Confidence in transparency recall**, binary variable: those who chose 'not sure' = 0, those who gave a number between 0 and 4 = 1.
+
+### Outcome 2: trustworthiness/credibility
+
+Tested in this experiment is whether the two experimental manipulations impact how trustworthy and credible the posts are perceived to be. Although different concepts, they correlate highly with each other and are measured using semantic differentials. Hypothesis 1b expects the presence of an imprint with a piece of material to not impact the perceived trustworthiness/credibility of an campaign post. However, hypothesis 2b predicts that when participants are informed explicitly about the imprints they will use it to determine trustworthiness: when a digital imprint is absent, the post will be perceived as less trustworthy, and when a digital imprint is present more trustworthy. 
+
+This expectation for H2b may also be mediated by the perceived political nature of the post, as the knowledge of the legislation is contingent on recognising that the post is political material that would require an imprint.
+
+#### Measurements of trustworthiness/credibility
+
+Trustworthiness/credibility is measured using semantic differentials taken from Bruns et al, 2023:
+
+- Accuracy: numerical scale 1-7, ‘inaccurate’ – ‘accurate’, 
+- Believability: numerical scale 1-7, ‘unbelievable’ – ‘believable’
+- Factuality: numerical scale 1-7,‘opinionated’ – ‘factual’
+- trustworthiness: numerical scale 1-7, ‘untrustworthy’ – ‘trustworthy’ 
+
+### Outcome 3: confidence in regulatory oversight
+
+Tested is whether explicit knowledge of the purpose of digital imprints increases the perception that regulatory oversight for political advertising is sufficient. Hypothesis 2c expects that this will be the case, with a higher mean value for regulation confidence in the training group compared to those who did not receive training.
+
+#### Measurements of regulatory confidence
+
+- Regulation sufficiency: numerical scale 1-7
+
+### Outcome/predictor 4: usefulness rankings
+
+Participants are asked to rank 6 options - including an 'other' option where they can input text - in order of who the information contained on a digital imprint is most useful to. 
+
+This measure is used to understand how voters interpret the relevance of such information to their own evaluations.
+
+It is additionally theorised this measure can capture distinctions between direct and indirect transparency perceptions. When citizens perceive transparent information as useful to others, they are theorised to express more trust in the campaign material they view overall and higher confidence in regulatory oversight for political advertising.
+
+On the other hand, as digital imprints alone are fairly uninformative about the kinds of information voters might want to learn, such as detailed financial records of campaign sponsors and ideological biases, voters who perceive this information as relevant to the self may express lower trust in campaign material overall and lower confidence in regulatory oversight.
+
+#### Measurement of usefulness ranking
+
+Each response obtains a number indicating the rated position for each participant. All are numerical ranging from 1-6.
+
+Rank options:
+
+- Voters
+- The Electoral Commission
+- Academic researchers
+- Journalists
+- The Police
+- Other
+
+### Control variables
+
+Demographic and political interest, knowledge and support measures are also captured to be included as controls in the model:
+
+- Agreement with the content of the campaign post
+
+Capturing agreement with the content of the post proxies political alignment and is necessary to include as political alignment is a strong predictor of trust in the content of advertisements. What is of interest is if digital imprints can have an effect on attitudes distinct from this.
+
+- Knowledge of existing regulation
+
+This control is relevant to the specific domain context, as perceptions of regulation are likely impacted by knowledge of regulation.
+
+- Political party identification
+
+This is another measure that captures political alignment.
+
+Other variables important in perceptions of political information are captured:
+
+- Age
+- Gender
+- Education
+- Satisfaction with democracy
+- Political interest
+- Political efficacy
+- Facebook use and frequency
+
+## Analysis plan: hypothesis 1a, 1b and 1c
+
+<details>
+
+```{r mixed effects libraries, warning=FALSE}
+
+library(lme4)
+library(Matrix)
+library(sjPlot)
+library(ggplot2)
+library(ggeffects)
+library(performance)
+library(see)
+library(patchwork)
+library(knitr)
+library(kableExtra)
+library(broom)
+
+```
+
+</details>
+
+Above are the R packages used for analysis and visualisation.
+
+### Hypothesis 1a, outcome: political goal {.tabset}
+
+Did the presence of a digital imprint with a piece of campaign material increase participant awareness that the material had a political goal?
+
+As this is a repeated measures design, the model tested is a random effects model, adding random effects for the advert viewed and the participant number.
+
+- Outcome: PG_value, numerical 1-7
+- Predictor: version, binary factor
+- Random effects: id and advert
+
+#### Model
+
+```{r political goal actual informedness}
+
+ainform_pg <- lmer(PG_value ~ version + (1|id) + (1|advert), data = imprint_df)
+
+```
+
+#### Model outcomes: table
+
+```{r, echo=FALSE, fig.align='center'}
+
+#Visualising the findings: table
+
+inform_pg_tab <- tab_model(ainform_pg, 
+                           pred.labels = c("Intercept", "Digital Imprint 
+                                           included"),
+                           dv.labels = "Perceived Political Nature")
+
+inform_pg_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+#visualising: raw data
+
+ggplot(imprint_df, aes(x = factor(version), y = PG_value)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Version of advert", y = "Political goal", title = "Distribution of political goal by version of ad viewed") +
+  theme_minimal()
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+#visualising the findings: model predictions
+
+# Generate predicted values using the ggeffects package
+preds <- ggpredict(ainform_pg, terms = "version")
+
+ggplot(preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted political goal value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived political goal") +
+  ylim(1, 7) +
+  theme_minimal()
+
+#Including controls in the model
+
+```
+
+#### Model assumptions
+
+```{r, echo=FALSE}
+
+#Checking model assumptions
+
+check_model(ainform_pg)
+
+
+#saving the table
+
+#saving the plot
+
+
+```
+
+### Hypothesis 1a, outcome: persuasion knowledge {.tabset}
+
+Did the presence of a digital imprint with a piece of campaign material increase participant awareness that the material was trying to persuade them of a certain viewpoint?
+
+- Outcome: PK, numerical 1-7
+- Predictor: version, binary factor
+- Random effects: id and advert
+
+#### Model
+
+```{r persuasion knowledge actual informedness}
+
+ainform_pk <- lmer(PK ~ version + (1|id) + (1|advert), data = imprint_df)
+
+```
+
+#### Model outcomes: table
+
+```{r, echo=FALSE, fig.align='center'}
+
+#Visualising the findings: table
+
+inform_pk_tab <- tab_model(ainform_pk, 
+                           pred.labels = c("Intercept", "Digital Imprint 
+                                           included"),
+                           dv.labels = "Persuasion knowledge")
+
+inform_pk_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(imprint_df, aes(x = factor(version), y = PK)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Version of advert", y = "Persuasion knowledge", title = "Distribution of persuasion knowledge by version of ad viewed") +
+  theme_minimal()
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+#visualising the findings: model predictions
+
+# Generate predicted values using the ggeffects package
+preds <- ggpredict(ainform_pk, terms = "version")
+
+ggplot(preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted persuasion knowledge value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived persuasion knowledge") +
+  ylim(1, 7) +
+  theme_minimal()
+
+#Including controls in the model
+
+```
+
+#### Model assumptions
+
+### Hypothesis 1b, outcome: recall of names {.tabset}
+
+Did viewing a digital imprint with a piece of campaign material increase participants memory of the campaigner name?
+
+To test this, each correct campaign name can be tested one by one with a logistical regression model to see if viewing the imprint boosted recall of the name. For this measure, there will therefore be 4 models and corresponding visualisations. This also uses the independent measures data frame with only one row per participant: training_df.
+
+Correct names:
+
+-   Advert 1: Common sense collective: CSC 
+-   Advert 2: Breaking barriers alliance: BBA
+-   Advert 3: Speak freely inc: SFI
+-   Advert 4: Campaign for a better Britain: CBB
+
+This analysis also will tell us something about how the imprint impacted recall for each advert differently. If imprints only increase recall on some adverts and not others, this may be related to the formatting and aesthetic features of the post itself e.g., how obvious the campaign name was, or even how memorable the name was. To find evidence that supports digital imprints consistently increase recall, regardless of the formatting of the imprint, we should expect to consistently see higher recall across four campaign group names when an imprint is present.
+
+#### Models
+
+The following models will be created using a function:
+
+csc_recall <- glm(CSC ~ Advert.1, data = training_df, family = binomial())
+
+bba_recall <- glm(BBA ~ Advert.2, data = training_df, family = binomial())
+
+sfi_recall <- glm(SFI ~ Advert.3, data = training_df, family = binomial())
+
+cbb_recall <- glm(CBB ~ Advert.4, data = training_df, family = binomial())
+
+
+```{r logistic regression function, echo=FALSE}
+
+fit_and_summarize_model <- function(outcome_var, predictor_var, data) {
+  # Fit the logistic regression model
+  formula <- as.formula(paste(outcome_var, "~", predictor_var))
+  model <- glm(formula, data = data, family = binomial())
+  
+  # Extract the model summary
+  summary_df <- summary(model)$coefficients
+  
+  # Calculate odds ratios
+  odds_ratios <- exp(summary_df[, 1])
+  
+  # Calculate 95% confidence intervals for odds ratios
+  conf_int <- exp(confint(model))
+  
+  # Create a summary table
+  model_table <- data.frame(
+    Coefficient = summary_df[, 1],
+    SE = summary_df[, 2],
+    `Odds Ratio` = odds_ratios,
+    `Lower CI` = conf_int[,1],  # 2.5 % 
+    `Upper CI` = conf_int[,2],  # 97.5%
+    `p-value` = summary_df[, 4]
+  )
+  
+  rownames(model_table) <- c("(Intercept)", predictor_var)
+  
+  return(model_table)
+}
+
+```
+
+#### Table
+
+Logs odds from the default model are converted to an odds ratio for easier interpretation. These are then presented as a table with the output of the regression. To understand the direction of the odds ratio, check the original log odds coefficient. 
+
+```{r, include=FALSE}
+
+# Define the outcome variables and their corresponding predictors
+#WILL NEED TO ADD IN CBB FOR REAL DATA SET
+outcomes_and_predictors <- list(
+  CSC = "Advert.1",
+  BBA = "Advert.2",
+  SFI = "Advert.3"
+)
+
+# Initialize an empty list to store the tables
+model_tables <- list()
+
+# Loop through each outcome-predictor pair
+for (outcome in names(outcomes_and_predictors)) {
+  predictor <- outcomes_and_predictors[[outcome]]
+  model_name <- paste(outcome, "recall", sep = "_")
+  
+  # Apply the function
+  model_tables[[model_name]] <- fit_and_summarize_model(outcome, predictor, training_df)
+}
+
+# model_tables now contains THREE tables - for real dataset, will have four
+
+list2env(model_tables, envir = .GlobalEnv)
+
+```
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Function to change the column names 
+
+column_names <- function(dataframe) {
+  dataframe <- dataframe %>%
+  rename(`Odds ratio` = `Odds.Ratio`,
+         `95% CI(lower)` = `Lower.CI`,
+         `95% CI(upper)` = `Upper.CI`,
+         `p-value` = `p.value`)
+  return(dataframe)
+}
+
+CSC_recall <- column_names(CSC_recall)
+BBA_recall <- column_names(BBA_recall)
+SFI_recall <- column_names(SFI_recall)
+#CBB_recall <- column_names(CBB_recall)
+
+# Function to change rowname
+
+row_names <- function(dataframe) {
+  rownames(dataframe)[2] <- "Imprint viewed with material"
+  
+  return(dataframe)
+}
+
+CSC_recall <- row_names(CSC_recall)
+BBA_recall <- row_names(BBA_recall)
+SFI_recall <- row_names(SFI_recall)
+#CBB_recall <- row_names(CBB_recall)
+
+kable(CSC_recall, format = "html", digits = 2, caption = "Recall of Common Sense Collective campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+kable(BBA_recall, format = "html", digits = 2, caption = "Recall of Breaking Barriers Alliance campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+kable(SFI_recall, format = "html", digits = 2, caption = "Recall of Speak Freely Inc campaign group by imprint viewed") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#kable(CBB_recall, format = "html", digits = 2, caption = "Recall of common sense #collective campaign group by imprint viewed") %>%
+#  kable_styling(bootstrap_options = c("striped", "hover"))
+
+
+```
+
+#### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+csc_raw <- ggplot(training_df, aes(x = factor(Advert.1, labels = c("no imprint", "imprint")), fill = factor(CSC, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Common Sense Collective", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Common Sense Collective", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+bba_raw <- ggplot(training_df, aes(x = factor(Advert.2, labels = c("no imprint", "imprint")), fill = factor(BBA, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Breaking Barriers Alliance", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Breaking Barriers Alliance", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(),
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+sfi_raw <- ggplot(training_df, aes(x = factor(Advert.3, labels = c("no imprint", "imprint")), fill = factor(SFI, levels = c(0, 1), labels = c("no recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Speak Freely Inc", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1", labels = c("no recall", "correct recall")) +
+  scale_x_discrete(name = "Speak Freely Inc", labels = c(`0` = "no imprint", `1` = "imprint")) +
+  theme(
+    axis.title.y = element_blank(), 
+    axis.text.y = element_blank(),
+    axis.title.x = element_text(size = rel(0.8))
+  )
+
+composite_plot <- csc_raw + bba_raw + sfi_raw + plot_layout(guides = "collect") 
+
+composite_plot
+
+```
+
+#### Model assumptions
+
+```{r}
+
+
+```
+
+### Hypothesis 1c: outcome: perceived informedness {.tabset}
+
+Did the presence of a digital imprint with a piece of campaign material increase participant's perception that they had been informed about the source of the content?
+
+- Outcome: informed, numerical 1-7
+- Predictor: version, binary factor
+- Random effects: id and advert
+
+#### Model
+
+```{r}
+
+inform_pi <- lmer(informed ~ version + (1|id) + (1|advert), data = imprint_df)
+
+```
+
+#### Model outcomes: table
+
+```{r, echo=FALSE, fig.align='center'}
+
+#Visualising the findings: table
+
+inform_pi_tab <- tab_model(inform_pi, 
+                           pred.labels = c("Intercept", "Digital Imprint 
+                                           included"),
+                           dv.labels = "Perceived informedness")
+
+inform_pi_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(imprint_df, aes(x = factor(version), y = informed)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Version of advert", y = "Perceived informedness", title = "Distribution of perceived informedness by version of ad viewed") +
+  theme_minimal()
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+#visualising the findings: model predictions
+
+# Generate predicted values using the ggeffects package
+preds <- ggpredict(inform_pi, terms = "version")
+
+ggplot(preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted perceived informedness value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived informedness") +
+  ylim(1, 7) +
+  theme_minimal()
+
+```
+
+#### Model assumptions
+
+
+### Supplementary check: advert level variations {.tabset}
+
+If hypothesis 1a is not supported and digital imprints are found to increase how informed an individual is, then advert level effects will be explored.
+
+Is there evidence to suggest that it is the aesthetic style and content of an advert itself that increases informedness about a source, and do digital imprints play a role in informing citizens above and beyond this?
+
+Claims tested:
+
+- Informedness about the source will be increased by the presence of a digital imprint, even when accounting for variations in campaign material content and format
+
+This hypothesis has already partly been tested in the name recall section under hypothesis 1a, outcome: recall of names.
+
+To further explore this, we can conduct an analysis comparing the effect of viewing each campaign post with and without the inclusion of a digital imprint on persuasion knowledge, political goal recognition, and perceived informedness.
+
+#### Persuasion knowledge
+
+```{r advert level variations in PK, echo=FALSE, fig.align='center'}
+
+# Calculate summary statistics
+summary_ad_PK <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_pk = mean(PK, na.rm = TRUE),
+            sd_pk = sd(PK, na.rm = TRUE),
+            se_pk = sd_pk / sqrt(n),
+            ci_upper = mean_pk + 1.96 * se_pk,
+            ci_lower = mean_pk - 1.96 * se_pk) %>%
+  ungroup()
+
+kable(summary_ad_PK, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved persuasion knowledge") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_PK_plot <- ggplot(data = imprint_df, aes(x = advert, y = PK, fill = version)) 
+
+ad_PK_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
+
+```
+
+#### Political goal recognition
+
+```{r advert level variations in PG, echo=FALSE, fig.align='center'}
+
+# Calculate summary statistics
+summary_ad_PG <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_pg = mean(PG_value, na.rm = TRUE),
+            sd_pg = sd(PG_value, na.rm = TRUE),
+            se_pg = sd_pg / sqrt(n),
+            ci_upper = mean_pg + 1.96 * se_pg,
+            ci_lower = mean_pg - 1.96 * se_pg) %>%
+  ungroup()
+
+kable(summary_ad_PG, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved political goal") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_PG_plot <- ggplot(data = imprint_df, aes(x = advert, y = PG_value, fill = version)) 
+
+ad_PG_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
+
+```
+
+#### Informedness
+
+```{r advert level variations in informed, echo=FALSE, fig.align='center'}
+
+# Calculate summary statistics
+summary_ad_in <- imprint_df %>%
+  group_by(advert, version) %>%
+  summarise(n = n(),
+            mean_in = mean(informed, na.rm = TRUE),
+            sd_in = sd(informed, na.rm = TRUE),
+            se_in = sd_in / sqrt(n),
+            ci_upper = mean_in + 1.96 * se_in,
+            ci_lower = mean_in - 1.96 * se_in) %>%
+  ungroup()
+
+kable(summary_ad_in, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved informedness") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+ad_in_plot <- ggplot(data = imprint_df, aes(x = advert, y = informed, fill = version))
+
+ad_in_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
+
+```
+
+## Analysis plan: hypothesis 2
+
+### Hypothesis 2: outcome: accuracy, believability, factualness, trustworthiness {.tabset}
+
+Did the inclusion of a digital imprint influence how trustworthy and credible the posts were perceived to be?
+
+Outcome: accurate/believable/factual/trustworthy, numerical scale 1-7
+Fixed effects: Version of post viewed, binary
+Random effects: id and advert
+
+#### Models
+
+The models below are created through a function
+
+- model_accurate_value <- lmer(accurate_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_believable_value <- lmer(believable_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_factual_value <- lmer(factual_value ~ version + (1|id) + (1|advert), data = imprint_df)
+- model_trustworthy_value <- lmer(trustworthy_value ~ version + (1|id) + (1|advert), data = imprint_df)
+
+```{r, include=FALSE}
+
+#function to create the models for each of the four outcomes
+
+fitMixedModel <- function(outcome, data) {
+  # Construct the formula string dynamically
+  formulaString <- paste(outcome, "~ version + (1|id) + (1|advert)", sep = " ")
+  # Convert the string to a formula
+  modelFormula <- as.formula(formulaString)
+  # Fit the model
+  model <- lmer(modelFormula, data = data)
+  # Construct a name for the model variable based on the outcome
+  modelName <- paste("model_", outcome, sep = "")
+  # Assign the model to the global environment
+  assign(modelName, model, envir = .GlobalEnv)
+}
+
+outcomes <- c("accurate_value", "believable_value", "factual_value", "trustworthy_value")
+
+lapply(outcomes, fitMixedModel, data = imprint_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+#Cannot create a function for this that doesn't output the tables as a new tab in a browser, rather than embedded in the knitted document. Also cannot centralise the tables in the knitted document. This will do for now.
+
+accuracy_tab <- tab_model(model_accurate_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved accuracy")
+
+believable_tab <- tab_model(model_believable_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved believability")
+
+factual_tab <- tab_model(model_factual_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved factualness")
+
+trustworthy_tab <- tab_model(model_trustworthy_value,
+          pred.labels = c("Intercept", "Digital Imprint included"),
+          dv.labels = "Percieved trustworthiness")
+
+accuracy_tab 
+believable_tab 
+factual_tab 
+trustworthy_tab
+  
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+long_trust_measures <- pivot_longer(imprint_df, 
+                                cols = c(accurate_value, believable_value, 
+                                         factual_value, trustworthy_value), 
+                                names_to = "outcome", 
+                                values_to = "value")
+
+ggplot(long_trust_measures, aes(x = outcome, y = value, fill = version)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Outcomes by Version",
+       x = "outcome",
+       y = "Distrubution of response") +
+  theme(axis.text.x = element_text(hjust = 1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+pred_accurate <- ggpredict(model_accurate_value, terms = "version")
+pred_believable <- ggpredict(model_believable_value, terms = "version")
+pred_factual <- ggpredict(model_factual_value, terms = "version")
+pred_trustworthy <- ggpredict(model_trustworthy_value, terms = "version")
+
+ggplot(pred_accurate, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted accuracy value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived accurateness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_believable, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted believable value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived believability of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_factual, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted factual value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived factualness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+ggplot(pred_trustworthy, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Version of advert", y = "Predicted trustworthy value (95% CI)", 
+       title = "Predicted effect of viewing an imprint on perceived trustworthiness of post") +
+  ylim(1, 7) +
+  theme_minimal()
+
+```
+
+
+#### Assumptions: accurate
+
+#### Assumptions: believable
+
+#### Assumptions: factual
+
+#### Assumptions: trustworthy
+
+
+## Analysis plan: hypothesis 3a, 3b, 3c and 3d
+
+### Hypothesis 3a: outcome: number recall {.tabset}
+
+Do participants more correctly recall that 2 of the pieces of material included imprints when they were trained of thier purpose (and primed to notice them)?
+
+- Outcome: recall_correct
+- Predictor: Training.condition
+
+#### Model
+
+```{r, warning=FALSE}
+
+#A previously created function is used to fit the model: glm(correct_recall ~ Training.condition, data = training_df, family = binomial())
+
+num_recall_table <- fit_and_summarize_model("recall_correct", "Training.condition", training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE, fig.align='center'}
+
+kable(num_recall_table, format = "html", digits = 2, caption = "Effect of the training condition on reducing incorrect recall of the number of posts with imprints") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+```
+
+#### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+num_recall_raw <- ggplot(training_df, aes(x = factor(Training.condition, labels = c("not trained", "trained")), fill = factor(recall_correct, levels = c("incorrect", "correct"), labels = c("incorrect recall", "correct recall")))) +
+  geom_bar(position = "stack", width = 0.2) +
+  labs(y = "Count", x = "Training condition", fill = "") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1")
+
+num_recall_raw
+
+```
+
+#### Model assumptions
+
+
+### Hypothesis 3b: outcome: correct name recall {.tabset}
+
+Did participants recall a higher number of correct campaigner names when they are trained to pay attention to the source?
+
+- Outcome: name_correct, numerical 0-3
+- Predictor: Training.condition
+
+#### Model
+
+```{r}
+
+correct_name <- lm(name_correct ~ Training.condition, data = training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE, fig.align='center'}
+
+correct_name_tab <- tab_model(correct_name, 
+                           pred.labels = c("Intercept", "Trained"),
+                           dv.labels = "Number of names correctly recalled")
+
+correct_name_tab
+
+```
+
+#### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = factor(Training.condition), y = name_correct)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Training condition", y = "Correct name recall", title = "Distribution of correct name recall by training condition") +
+  theme_minimal()
+
+```
+
+#### Plotting: Model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Generate predicted values using the ggeffects package
+correct_name_preds <- ggpredict(correct_name, terms = "Training.condition")
+
+ggplot(correct_name_preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Training condition", y = "Predicted correct name recall (95% CI)", 
+       title = "Predicted effect of training condition on correct name recall") +
+  ylim(0, 3) +
+  theme_minimal()
+
+```
+
+#### Assumptions
+
+```{r}
+
+check_model(correct_name)
+
+```
+
+### Hypothesis 3c: outcome: perceived informedness {.tabset}
+
+Were trained participants more likely to correctly identify that they were less informed when a digital imprint was *not* present, and more informed when a digital imprint was present, compared to the group who received no training?
+
+#### Model
+
+- Outcome: perceived informedness, numerical 1-7
+- fixed effect: training condition x version of imprint viewed (interaction effect)
+- random effects: id and advert
+
+```{r}
+
+inform_training <- lmer(informed ~ Training.condition + version + Training.condition*version + (1|id) + (1|advert), data = imprint_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+inform_train_tab <- tab_model(inform_training, 
+                           pred.labels = c("Intercept", "Training", "Digital Imprint 
+                                           included", "Training*imprint"),
+                           dv.labels = "Perceived Informedness")
+
+inform_train_tab
+
+```
+
+#### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Calculate summary statistics
+summary_stats <- imprint_df %>%
+  group_by(Training.condition, version) %>%
+  summarise(n = n(),
+            mean_informed = mean(informed, na.rm = TRUE),
+            sd_informed = sd(informed, na.rm = TRUE),
+            se_informed = sd_informed / sqrt(n),
+            ci_upper = mean_informed + 1.96 * se_informed,
+            ci_lower = mean_informed - 1.96 * se_informed) %>%
+  ungroup()
+
+kable(summary_stats, format = "html", digits = 2, caption = "Decriptive bivariate statistics for percieved informedness") %>%
+  kable_classic(full_width = F, position = "center", html_font = "Cambria")
+
+#Plotting the raw data
+
+pi_plot <- ggplot(data = imprint_df, aes(x = Training.condition, y = informed, fill = version)) 
+
+pi_plot + 
+  geom_point(aes(color = version), position = position_jitterdodge(), alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  theme_minimal()
+
+```
+
+#### Plotting: Model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+preds <- ggpredict(inform_training, terms = c("Training.condition", "version"))
+
+plot(preds) +
+  ylim(1, 7) +
+  labs(title = "Interaction Effect",
+       x = "Training condition",
+       y = "Predicted perceived informedness",
+       color = "Digital imprint \n included")
+
+```
+
+#### Assumptions
+
+### Hypothesis 3d: outcome: correct versus incorrect recall {.tabset}
+
+Does percieved informedness correlate with actual informedness? How is percieved informedness impacted by the training condition?
+
+This hypothesis has already partly been tested by previous models. For example, the interaction effect of training condition and version on percieved informedness. Here, if percieved informedness correlated with actual informedness, we would expect to see lower informedness for material viewed without an imprint. We would expect a bigger difference between those who had been trained, indicating a higher awareness and understanding about when they had - and had not - been informed about the source.
+
+However, we can further test whether the training condition caused participants to be more confident in how informed they were, but less accurate. This is by using the responses from the name recall measure, where participants were given a multiple choice of many names and were asked to identify the campaign names of the posts they viewed. Four were correct, and a higher number of correct name identification suggests increased informedness about the source. However, those who were trained might just feel more confident that they are informed and therefore more likely to select a number of names from the list. As four of the names were incorrect, to check for this we can test whether the training condition increased the number of incorrect names identified - this indicates increased confidence, but lower accuracy.
+
+#### Model
+
+- Outcome: name_incorrect, numerical 0-4
+- Predictor: Training.condition
+
+```{r}
+
+incorrect_name <- lm(name_incorrect ~ Training.condition, data = training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE, fig.align='center'}
+
+incorrect_name_tab <- tab_model(incorrect_name, 
+                           pred.labels = c("Intercept", "Trained"),
+                           dv.labels = "Number of names incorrectly recalled")
+
+incorrect_name_tab
+
+```
+
+#### Plotting: Raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = factor(Training.condition), y = name_incorrect)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Training condition", y = "Incorrect name recall", title = "Distribution of incorrect name recall by training condition") +
+  theme_minimal()
+
+```
+
+#### Plotting: Model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Generate predicted values using the ggeffects package
+incorrect_name_preds <- ggpredict(incorrect_name, terms = "Training.condition")
+
+ggplot(incorrect_name_preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Training condition", y = "Predicted incorrect name recall (95% CI)", 
+       title = "Predicted effect of training condition on incorrect name recall") +
+  ylim(0, 3) +
+  theme_minimal()
+
+```
+
+#### Assumptions
+
+```{r}
+
+check_model(incorrect_name)
+
+```
+
+## Analysis plan: hypothesis 4
+
+### Hypothesis 4: outcome: accuracy, believablity, factualness, trustworthiness {.tabset}
+
+Did those informed about the purpose of imprints use their absense/presence to evaluate the trustworthiness and credibility of the posts? 
+
+*These measures will all be analysed in the same way as hypothesis 2a: outcome: perceived informedness, with an interaction effect between the training condition and the version of the advert viewed.*
+
+- Outcome: accurate/factual/believable/trustworthy, numerical 1-7
+- fixed effect: training condition x version of imprint viewed (interaction effect)
+- random effects: id and advert
+
+#### Models
+
+*Currently unfinished*
+
+## Analysis plan: hypothesis 5
+
+### Hypothesis 5: outcome: confidence in regulation {.tabset}
+
+Does being informed explicitly about the purpose of digital imprints and their relation to regulatory compliance increase perceptions that political advertising is sufficiently regulated in the UK?
+
+This model uses the training_df dataframe.
+
+- Outcome: confidence in regulation, numerical 1-7
+- Predictor: training condition
+
+#### Model
+
+```{r}
+
+regulation_model <- lm(election_reg ~ Training.condition, data = training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+regulation_tab <- tab_model(regulation_model, 
+                           pred.labels = c("Intercept", "Trained"),
+                           dv.labels = "Perceived sufficiency of advertising 
+                           regulation")
+
+regulation_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = factor(Training.condition), y = election_reg)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_boxplot(width = 0.2) +
+  labs(x = "Training condition", y = "Regulation confidence", title = "Distribution of regulation confidence by training condition") +
+  theme_minimal()
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+# Generate predicted values using the ggeffects package
+regulation_preds <- ggpredict(regulation_model, terms = "Training.condition")
+
+ggplot(regulation_preds, aes(x = x, y = predicted)) +
+  geom_point() +  
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1) +
+  labs(x = "Training condition", y = "Predicted regulation confidence (95% CI)", 
+       title = "Predicted effect of training condition on regulation confidence") +
+  ylim(1, 7) +
+  theme_minimal()
+
+```
+
+## Analysis plan: hypothesis 6
+
+### Hypothesis 6: outcome: rank position {.tabset}
+
+Who did participants rank the digital imprint as most useful to out of the options?
+
+Options:
+
+- useful_rank_1 = Voters
+- useful_rank_2 = The Electoral Commission
+- useful_rank_3 = Academic researchers
+- useful_rank_4 = Journalists
+- useful_rank_5 = The Police
+- useful_rank_6 = Other
+
+#### Plotting: frequency
+
+```{r, echo=FALSE, fig.align='center'}
+
+#create long data for each of the response options
+
+long_useful_measures <- pivot_longer(training_df, 
+                                cols = c(useful_rank_1, useful_rank_2, useful_rank_3,
+                                         useful_rank_4, useful_rank_5, useful_rank_6
+                                         ), 
+                                names_to = "ranking", 
+                                values_to = "option")
+
+#rename the categories within ranking and order
+
+long_useful_measures <- long_useful_measures %>%
+  mutate(ranking = recode(ranking, 
+         useful_rank_1 = "Voters",
+         useful_rank_2 = "The Electoral Commission",
+         useful_rank_3 = "Academic researchers",
+         useful_rank_4 = "Journalists",
+         useful_rank_5 = "The Police",
+         useful_rank_6 = "Other"),
+         ranking = factor(ranking, levels = c("Voters", 
+                                              "The Electoral Commission", 
+                                              "Academic researchers", 
+                                              "Journalists", 
+                                              "The Police", 
+                                              "Other")))
+
+#Plotting a bubble chart for frequency visualistion
+
+long_useful_freq <- long_useful_measures %>%
+  group_by(ranking, option) %>%
+  summarise(count = n(), .groups = 'drop')
+
+ggplot(long_useful_freq, aes(x = ranking, y = option, size = count)) +
+  geom_point(colour = "sienna3") + 
+  scale_fill_brewer(palette = "Spectral") + # Color palette for fill
+  scale_size_continuous(range = c(3, 12)) + # Adjust bubble sizes as needed
+  labs(title = "Rank Ordering of Options",
+       x = "Category",
+       y = "Rank",
+       size = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45)) +
+  scale_y_reverse()
+
+```
+
+#### Plotting: boxplots
+
+This will plot the distribution across each of the 6 response options.
+
+```{r, echo=FALSE, fig.align='center'}
+
+#plot the distribution
+
+ggplot(long_useful_measures, aes(x = ranking, y = option)) +
+  geom_boxplot(width = 0.3) +
+  theme_minimal() +
+  labs(title = "Distrubution of ranking",
+       x = "Category",
+       y = "Distrubution of response") +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45))
+
+```
+
+## Analysis plan: hypothesis 7
+
+### Hypothesis 7a: outcome: trustworthiness {.tabset}
+
+Did perceiving digital imprints as useful to other agents, as opposed to the self, increase overall perceived trustworthiness of the campaign material?
+
+As a predictor, the higher the number for useful_rank_1 the less useful the information made transparent was perceived to be to the self/voters.
+
+- Outcome: trustworthy, numerical 1-7
+- Fixed effect: useful_rank_1, numerical 1-6
+- Random effects: id and advert
+
+#### Model
+
+```{r}
+
+useful_trust_model <- lmer(trustworthy_value ~ useful_rank_1 + (1|id) + (1|advert), 
+                           data = imprint_df)
+
+```
+
+#### Table
+
+The rank position coefficient predicts the effect of perceiving the usefulness of the information as incrementally less relevant to the self/voter. The higher the number of the measure, the less useful this information was seen to be for the self. If the hypothesis were supported, we would expect to see a positive coeffecient.
+
+```{r, echo=FALSE}
+
+useful_trust_tab <- tab_model(useful_trust_model,
+          pred.labels = c("Intercept", "Rank position"),
+          dv.labels = "Percieved trustworthiness of campaign material")
+
+useful_trust_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(data=imprint_df, aes(x=useful_rank_1, y=trustworthy_value)) +
+  geom_point() +
+  geom_jitter() +
+  geom_smooth(method = lm, se=FALSE) +
+  theme_minimal() +
+  labs(
+    title = "Association between rank position and perceived trustworthiness of the \n campaign material",
+    x = "Rank position of 'voter' (1 = most useful to)",
+    y = "Percieved trustworthiness"
+  ) +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+useful_trust_preds <- ggpredict(useful_trust_model, terms="useful_rank_1")
+
+ggplot(useful_trust_preds, aes(x = x, y = predicted)) +
+  geom_line(aes(y = predicted), color = "blue") +
+  geom_ribbon(aes(ymin = predicted - std.error, ymax = predicted + std.error), fill = "lightgrey", alpha = 0.2) +
+  ylim(1, 7) +
+  scale_x_continuous(breaks = seq(1, 6, by=1)) +
+  theme_minimal() +
+  labs(x = "Rank position of voter (1 = most useful to)", y = "Predicted trustworthiness", 
+       title = "Predicted effect of voter rank position on perceived trustworthiness of \n campaign material") 
+
+```
+
+
+### Hypothesis 7b: outcome: regulation confidence {.tabset}
+
+Is perceiving the usefulness of digital imprints as useful to other agents, as opposed to the self, associated with higher regulation confidence?
+
+- Outcome: regulation confidence, numerical 1-7
+- Predictor: useful_rank_1, numerical 1-6
+
+#### Model
+
+```{r}
+
+useful_reg_model <- lm(election_reg ~ useful_rank_1, data = training_df)
+
+```
+
+#### Table
+
+```{r, echo=FALSE}
+
+useful_reg_tab <- tab_model(useful_reg_model, 
+                           pred.labels = c("Intercept", "Rank of 'voter'"),
+                           dv.labels = "Perceived sufficiency of advertising 
+                           regulation")
+
+useful_reg_tab
+
+```
+
+#### Plotting: raw data
+
+```{r, echo=FALSE, fig.align='center'}
+
+ggplot(training_df, aes(x = useful_rank_1, y = election_reg)) +
+  geom_point() +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  geom_smooth(method=lm, se = FALSE) +
+  labs(x = "Rank position of 'voter' (1 = most useful to)", 
+       y = "Regulation confidence", 
+       title = "Association between rank position of voter and regulation confidence") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(1, 6, by=1))
+
+```
+
+#### Plotting: model predictions
+
+```{r, echo=FALSE, fig.align='center'}
+
+useful_reg_preds <- ggpredict(useful_reg_model, terms="useful_rank_1")
+
+ggplot(useful_reg_preds, aes(x = x, y = predicted)) +
+  geom_line(aes(y = predicted), color = "blue") +
+  geom_ribbon(aes(ymin = predicted - std.error, ymax = predicted + std.error), fill = "lightgrey", alpha = 0.2) +
+  ylim(1, 7) +
+  scale_x_continuous(breaks = seq(1, 6, by=1)) +
+  theme_minimal() +
+  labs(x = "Rank position of voter (1 = most useful to)", y = "Predicted regulation confidence", 
+       title = "Predicted effect of voter rank position on regulation confidence") 
+
+```
+
